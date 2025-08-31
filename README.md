@@ -7,4 +7,14 @@ A method to modulate between chords that uses a curated dataset or chords organi
 Google collab and Python example available for download to demonstate applciation of theory.
 XLSX with chord family dataset required for demos.
 
-More to come.
+More explanations to come.
+
+.Py controls:
+
+1-8 +play chords
+
+G = generate
+
+U = undo
+
+R and 1-8 = regen specific chord
