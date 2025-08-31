@@ -11,7 +11,7 @@ More explanations to come.
 
 .Py controls:
 
-1-8 +play chords
+1-8 = play chords
 
 G = generate
 
