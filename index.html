@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ChordWeb Mobile (XLSX v4: GitHub Pages loader)</title>
+<title>ChordWeb (XLSX v4: GitHub Pages loader)</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   :root{
@@ -43,7 +43,7 @@
 <body>
 <div class="wrap" id="app" data-theme="dark">
   <header>
-    <h1>ChordWeb Mobile</h1>
+    <h1>ChordWeb </h1>
     <button id="themeBtn" class="iconbtn" title="Toggle theme">🌙</button>
     <div class="spacer"></div>
     <span title="SpiderWeb" style="font-size:22px">🕸️</span>
@@ -60,7 +60,6 @@
       <label>Auto</label>
       <input id="urlBox" type="text" placeholder="https://.../data.xlsx (or ?xlsx=...)" style="min-width:320px; flex:1"/>
       <button id="loadUrl" class="tight">Load URL</button>
-      <span class="small">On GitHub Pages, just put a <b>data.xlsx</b> next to this HTML and it will auto-load.</span>
     </div>
     <div class="row">
       <label>Count</label>
@@ -368,7 +367,7 @@ function onBaseChange(){
 }
 function onStartChange(){ refreshStartChoices(); }
 
-// ------------ Audio (WebAudio) ------------
+// ------------ Audio (WebAudio) with normalization & compressor ------------
 let audioCtx = null;
 function ensureAudio(){
   if(!audioCtx){ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }
@@ -376,27 +375,51 @@ function ensureAudio(){
   return audioCtx;
 }
 function playChord(notes, gain=0.45, seconds=0.9){
+  if(!notes || !notes.length) return;
   const ctx = ensureAudio();
   const now = ctx.currentTime + 0.01;
-  const master = ctx.createGain();
-  master.connect(ctx.destination);
-  master.gain.value = Math.max(0,Math.min(1,gain));
+  const userGain = Math.max(0, Math.min(1, gain));
+  const vol = Math.pow(userGain, 1.6); // nicer slider response
 
+  // compressor
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -24;
+  comp.knee.value = 30;
+  comp.ratio.value = 12;
+  comp.attack.value = 0.003;
+  comp.release.value = 0.25;
+
+  const master = ctx.createGain();
+  master.gain.value = vol;
+  comp.connect(master);
+  master.connect(ctx.destination);
+
+  const n = notes.length;
   const baseMidi = 48;
+  const perVoice = 0.6 / Math.sqrt(n);
+
+  // ADSR
+  const a = 0.02, d = 0.03, s = 0.85, r = 0.20;
+  const endTime = now + seconds;
+
   for(const x of notes){
     const osc = ctx.createOscillator();
     const g = ctx.createGain();
     const hz = 440 * Math.pow(2, ((baseMidi + (x%12)) - 69)/12);
-    osc.frequency.value = hz;
     osc.type = 'sine';
-    osc.connect(g); g.connect(master);
-    const a = 0.02, r = 0.15;
-    g.gain.setValueAtTime(0, now);
-    g.gain.linearRampToValueAtTime(1, now+a);
-    g.gain.setValueAtTime(1, now+seconds-r);
-    g.gain.linearRampToValueAtTime(0, now+seconds);
+    osc.frequency.setValueAtTime(hz, now);
+
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(perVoice, now + a);
+    g.gain.exponentialRampToValueAtTime(perVoice * s, now + a + d);
+    g.gain.setValueAtTime(perVoice * s, endTime - r);
+    g.gain.exponentialRampToValueAtTime(0.0001, endTime);
+
+    osc.connect(g);
+    g.connect(comp);
+
     osc.start(now);
-    osc.stop(now+seconds+0.02);
+    osc.stop(endTime + 0.02);
   }
 }
 
@@ -724,6 +747,26 @@ window.addEventListener('load', async ()=>{
     }
   } catch(e){
     // ignore
+  }
+});
+// ------------ Keyboard shortcuts ------------
+document.addEventListener('keydown', (e)=>{
+  const tag=(e.target&&e.target.tagName)?e.target.tagName.toLowerCase():'';
+  if(tag==='input'||tag==='textarea'||tag==='select'||e.metaKey||e.ctrlKey||e.altKey){return;}
+  const k=e.key.toLowerCase();
+  if(k==='g'){ document.getElementById('gen').click(); e.preventDefault(); return; }
+  if(k==='u'){ if(canUndo()){ undo(); e.preventDefault(); } return; }
+  if(k==='r'){ if(canRedo()){ redo(); e.preventDefault(); } return; }
+  if(k>='1'&&k<='8'){
+    const idx=parseInt(k,10)-1;
+    if(idx>=0&&idx<CURRENT.length){
+      const p=parseLabel(CURRENT[idx]);
+      if(p){ const [root,qual]=p; const [notes]=build7th(root,qual);
+        const vol = Math.max(0, Math.min(1, (parseInt(document.getElementById('vol').value||"45")/100)));
+        playChord(notes, vol);
+      }
+      e.preventDefault();
+    }
   }
 });
 </script>
