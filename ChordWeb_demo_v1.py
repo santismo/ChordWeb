@@ -231,7 +231,7 @@ def load_workbook_structure(xlsx_path):
 class ChordApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("ChordNet")
+        self.title("ChordWeb")
         self.geometry("1280x720")
         self.minsize(980, 600)
 
@@ -465,7 +465,7 @@ class ChordApp(tk.Tk):
         self.refresh_starting_choices()
         self.sub_var.set("All Sub Modes")
         self.clear_results()
-        self.title("ChordNet")
+        self.title("ChordWeb")
 
     def set_defaults_and_autogen(self):
         target_sheet = "C"
