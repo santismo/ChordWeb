@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ChordWeb Mobile (XLSX v4: GitHub Pages loader)</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#0f172a; --fg:#e5e7eb; --card:#111827; --border:#374151;
+    --accent:#2563eb; --muted:#94a3b8;
+  }
+  [data-theme="light"]{ --bg:#f8fafc; --fg:#0f172a; --card:#f9fafb; --border:#e5e7eb; }
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:980px;margin:0 auto;padding:12px}
+  header{display:flex;align-items:center;gap:10px}
+  h1{font-size:18px;margin:0 6px 0 0}
+  button, select, input[type="number"], input[type="range"], input[type="text"]{
+    border-radius:14px;border:1px solid var(--border);background:var(--card);color:var(--fg);
+    padding:10px 12px;font-size:15px;
+  }
+  .accent{background:var(--accent); color:#fff;border-color:transparent}
+  .toolbar{display:grid;grid-template-columns:1fr 1fr; gap:8px; margin-top:10px}
+  .row{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+  .row label{min-width:64px; color:var(--muted); font-size:14px}
+  .pill{padding:6px 10px; border-radius:999px; background:var(--card); border:1px solid var(--border)}
+  .cards{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:12px 0 24px}
+  @media (max-width:720px){ .cards{grid-template-columns:1fr} }
+  .card{ background:var(--card); border:1px solid var(--border); border-radius:16px; padding:10px; display:flex; gap:12px; align-items:center; }
+  .card h3{margin:0 0 6px 0; font-size:16px}
+  .card .img{flex:1}
+  .card .ctrls{display:flex; flex-direction:column; gap:8px; width:120px}
+  .small{font-size:12px; color:var(--muted)}
+  .spacer{flex:1}
+  .iconbtn{width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;border-radius:999px}
+  .tight{padding:6px 10px}
+  .notice{color:#ef4444;margin:8px 0}
+  details{border:1px solid var(--border); border-radius:12px; padding:8px; background:var(--card); margin-top:8px}
+  summary{cursor:pointer}
+  .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:12px; color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap" id="app" data-theme="dark">
+  <header>
+    <h1>ChordWeb Mobile</h1>
+    <button id="themeBtn" class="iconbtn" title="Toggle theme">🌙</button>
+    <div class="spacer"></div>
+    <span title="SpiderWeb" style="font-size:22px">🕸️</span>
+  </header>
+
+  <div class="toolbar">
+    <div class="row">
+      <label>Load</label>
+      <input type="file" id="file" accept=".csv,.xlsx,.xls" />
+      <button id="demo" class="tight">Load demo</button>
+      <button id="showStats" class="tight">Stats</button>
+    </div>
+    <div class="row">
+      <label>Auto</label>
+      <input id="urlBox" type="text" placeholder="https://.../data.xlsx (or ?xlsx=...)" style="min-width:320px; flex:1"/>
+      <button id="loadUrl" class="tight">Load URL</button>
+      <span class="small">On GitHub Pages, just put a <b>data.xlsx</b> next to this HTML and it will auto-load.</span>
+    </div>
+    <div class="row">
+      <label>Count</label>
+      <input id="count" type="number" min="1" max="16" value="8"/>
+      <label style="margin-left:6px">Vol</label>
+      <input id="vol" type="range" min="0" max="100" value="45"/>
+    </div>
+
+    <div class="row">
+      <label>Root</label>
+      <select id="rootSel"><option>All Keys</option></select>
+      <button id="rootRnd" class="iconbtn">🎲</button>
+    </div>
+    <div class="row">
+      <label>Base</label>
+      <select id="baseSel"><option>All Base Modes</option></select>
+      <button id="baseRnd" class="iconbtn">🎲</button>
+    </div>
+
+    <div class="row">
+      <label>Sub</label>
+      <select id="subSel"><option>All Sub Modes</option></select>
+      <button id="subRnd" class="iconbtn">🎲</button>
+    </div>
+
+    <div class="row">
+      <label>Start</label>
+      <select id="startSel"><option>(none)</option></select>
+      <button id="startRnd" class="iconbtn">🎲</button>
+      <span class="small">(optional)</span>
+    </div>
+
+    <div class="row" style="grid-column:1/-1">
+      <label>Rows</label>
+      <input id="rowsEnable" type="checkbox"/>
+      <span class="small">Diatonic 1 ↔ 10 Chromatic</span>
+      <input id="rows" type="range" min="1" max="10" step="1" value="1" style="flex:1"/>
+    </div>
+  </div>
+
+  <div class="row" style="margin-top:10px">
+    <button id="randAll" class="pill">🎲 Random All</button>
+    <button id="gen" class="pill accent">🌀 Generate</button>
+    <button id="copy" class="pill">📋 Copy names</button>
+  </div>
+
+  <div id="notice" class="notice"></div>
+  <div id="cards" class="cards"></div>
+
+  <details id="statsBox" style="display:none">
+    <summary>Parsed dataset stats</summary>
+    <div class="mono" id="stats"></div>
+  </details>
+</div>
+
+<script>
+// ------------ Utilities & theory ------------
+const noteToSemi = {"C":0,"B#":0,"C#":1,"Db":1,"D":2,"D#":3,"Eb":3,"E":4,"Fb":4,"F":5,"E#":5,"F#":6,"Gb":6,"G":7,"G#":8,"Ab":8,"A":9,"A#":10,"Bb":10,"B":11,"Cb":11,
+"Ebb":2,"Abb":6,"Bbb":9,"Fbb":3,"Cbb":10,"Gbb":5,"Dbb":0};
+const enh = {"Ebb":"D","Bbb":"A","Abb":"G","Dbb":"C","Gbb":"F","Cbb":"Bb","Fbb":"Eb","B#":"C","E#":"F","Cb":"B","Fb":"E"};
+const CANON = {0:'C',1:'C#',2:'D',3:'Eb',4:'E',5:'F',6:'F#',7:'G',8:'Ab',9:'A',10:'Bb',11:'B'};
+const romanRe = /^[b♭]?(?:I|II|III|IV|V|VI|VII)°?$/i;
+function fallbackQuality(n){
+  n = (n||"").toLowerCase().replace("♭","b").replace("°","");
+  return ({'v':'dom7','ii':'min7','iii':'min7','vi':'min7'})[n] || 'maj7';
+}
+function parseLabel(label){
+  const parts = (label||"").trim().split(/\s+/);
+  if(!parts.length) return null;
+  let numeral = ""; let rootTokens = parts;
+  if(romanRe.test(parts[parts.length-1])){
+    numeral = parts.at(-1); rootTokens = parts.slice(0,-1);
+  }
+  let root = rootTokens.join("").replace(/\s+/g,"");
+  if(root.endsWith("°")) return [root.slice(0,-1),'dim7'];
+  if(root.endsWith("m")) return [root.slice(0,-1),'min7'];
+  if((numeral||"").toLowerCase()==='v') return [root,'dom7'];
+  return [root, fallbackQuality(numeral)];
+}
+function canonicalNoteName(root){
+  let rf = (root||"").replace("♯","#").replace("♭","b");
+  if(enh[rf]) rf = enh[rf];
+  let s = noteToSemi[rf];
+  if(s==null) return root||"?";
+  return CANON[(s%12+12)%12] || root;
+}
+function canonicalize(label){
+  const p = parseLabel(label);
+  if(!p) return label;
+  const [r,q] = p;
+  return canonicalNoteName(r)+" "+q;
+}
+function build7th(root, quality){
+  let rf = (root||"").replace("♯","#").replace("♭","b");
+  if(!(rf in noteToSemi) && (rf in enh)) rf = enh[rf];
+  const r = noteToSemi[rf]; if(r==null) return [[],null];
+  const iv = {'maj7':[0,4,7,11],'min7':[0,3,7,10],'dom7':[0,4,7,10],'dim7':[0,3,6,9]}[quality] || [0,4,7,11];
+  return [iv.map(i=>r+i), r];
+}
+function isValidChordLabel(s){
+  const p = parseLabel(s);
+  if(!p) return false;
+  const [root, q] = p;
+  const [notes] = build7th(root, q);
+  return notes && notes.length>=3;
+}
+
+// ------------ CSV parser ------------
+function parseCSV(text){
+  const rows=[]; let row=[]; let cur=""; let q=false;
+  for(let i=0;i<text.length;i++){
+    const ch = text[i];
+    if(ch === '"'){ if(q && text[i+1]==='"'){ cur+='"'; i++; } else { q=!q; } }
+    else if(ch === ',' && !q){ row.push(cur); cur=""; }
+    else if((ch === '\n' || ch === '\r') && !q){
+      if(cur.length || row.length){ row.push(cur); rows.push(row); row=[]; cur=""; }
+    } else { cur+=ch; }
+  }
+  if(cur.length || row.length){ row.push(cur); rows.push(row); }
+  return rows;
+}
+
+// ------------ Data store ------------
+const DB = { keys:[], data:{}, chordIndex:new Map(), allChords:[], stats:{sheets:0, rows:0, rowsUsed:0, chords:0} };
+
+function indexData(data){
+  const chordIndex = new Map(); const allChords = new Set(); const keysSet = new Set(Object.keys(data));
+  let chordsCount = 0, rowsUsed = 0;
+  for(const [k,bases] of Object.entries(data)){
+    for(const [b,subs] of Object.entries(bases)){
+      for(const [s,rows] of Object.entries(subs)){
+        for(const row of rows){
+          const filtered = row.filter(isValidChordLabel);
+          if(!filtered.length) continue;
+          rowsUsed++;
+          for(const c of filtered){
+            chordsCount++;
+            allChords.add(c);
+            if(!chordIndex.has(c)) chordIndex.set(c,new Set());
+            chordIndex.get(c).add(`${k}||${b}||${s}`);
+          }
+          row.length = 0; row.push(...filtered);
+        }
+      }
+    }
+  }
+  DB.keys = Array.from(keysSet).sort();
+  DB.data = data;
+  DB.chordIndex = chordIndex;
+  DB.allChords = Array.from(allChords).sort();
+  DB.stats.rowsUsed = rowsUsed;
+  DB.stats.chords = chordsCount;
+}
+
+function ingestRows(rows){
+  if(!rows.length) return;
+  const headers = rows[0].map(h=>h.trim());
+  const idxRoot = headers.findIndex(h=>/^root$/i.test(h)) !== -1 ? headers.findIndex(h=>/^root$/i.test(h)) : 0;
+  const idxBase = headers.findIndex(h=>/^base ?mode$/i.test(h));
+  const idxSub  = headers.findIndex(h=>/^sub ?mode$/i.test(h));
+  const chordCols = headers.map((h,i)=>i).filter(i=>i>=0 && i!==idxRoot && i!==idxBase && i!==idxSub);
+  const data = {};
+  for(let r=1;r<rows.length;r++){
+    const row = rows[r];
+    const key = (row[idxRoot]||"").trim() || "Unknown";
+    const base = (row[idxBase]||"").trim();
+    const sub  = (row[idxSub]||"").trim();
+    const chords = chordCols.map(i=>row[i]).filter(Boolean).map(s=>s.trim()).filter(isValidChordLabel);
+    if(!base || !sub || !chords.length) continue;
+    data[key] ??= {};
+    data[key][base] ??= {};
+    data[key][base][sub] ??= [];
+    data[key][base][sub].push(chords);
+  }
+  DB.stats.sheets = 1;
+  DB.stats.rows = rows.length-1;
+  indexData(data);
+}
+
+function ingestXLSX(workbook){
+  const data = {};
+  const sheetNames = workbook.SheetNames || [];
+  let totalRows = 0;
+  for(const sname of sheetNames){
+    const ws = workbook.Sheets[sname];
+    if(!ws) continue;
+    const rows = XLSX.utils.sheet_to_json(ws, { header:1, raw:true, blankrows:false });
+    if(!rows || rows.length < 2) continue;
+    totalRows += (rows.length-1);
+    const key = (sname||"").trim() || "Unknown";
+    let lastBase = "", lastSub = "";
+    for(let r=1;r<rows.length;r++){
+      const row = rows[r] || [];
+      const baseCell = (row[1]!=null ? (""+row[1]) : "").trim();
+      const subCell  = (row[2]!=null ? (""+row[2]) : "").trim();
+      if(baseCell) lastBase = baseCell;
+      if(subCell)  lastSub  = subCell;
+      const base = lastBase;
+      const sub  = lastSub;
+      const chords = [];
+      for(let c=3;c<100;c++){
+        const val = row[c];
+        if(val==null) continue;
+        const s = (""+val).trim();
+        if(!s) continue;
+        if(isValidChordLabel(s)) chords.push(s);
+      }
+      if(!base || !sub || !chords.length) continue;
+      data[key] ??= {};
+      data[key][base] ??= {};
+      data[key][base][sub] ??= [];
+      data[key][base][sub].push(chords);
+    }
+  }
+  DB.stats.sheets = sheetNames.length;
+  DB.stats.rows = totalRows;
+  indexData(data);
+}
+
+// ------------ Buckets/Pool ------------
+function bucketsFor(selKey, selBase, selSub){
+  const keys = selKey==="All Keys" ? DB.keys : [selKey];
+  const out=[];
+  for(const k of keys){
+    const bdict = DB.data[k]||{};
+    const bases = selBase==="All Base Modes" ? Object.keys(bdict) : [selBase];
+    for(const b of bases){
+      const sdict = bdict[b]||{};
+      const subs = selSub==="All Sub Modes" ? Object.keys(sdict) : [selSub];
+      for(const s of subs){
+        const rows = sdict[s]||[];
+        for(const r of rows){
+          const rr = r.filter(isValidChordLabel);
+          if(rr.length) out.push(rr);
+        }
+      }
+    }
+  }
+  return out;
+}
+function poolFor(selKey, selBase, selSub){
+  const keys = selKey==="All Keys" ? DB.keys : [selKey];
+  const out=[];
+  for(const k of keys){
+    const bdict = DB.data[k]||{};
+    for(const [b,subs] of Object.entries(bdict)){
+      if(selBase!=="All Base Modes" && b!==selBase) continue;
+      for(const [s,rows] of Object.entries(subs)){
+        if(selSub!=="All Sub Modes" && s!==selSub) continue;
+        for(const r of rows){ for(const c of r){ if(isValidChordLabel(c)) out.push(c); } }
+      }
+    }
+  }
+  return out;
+}
+
+function refreshStartChoices(){
+  const keySel = document.getElementById('rootSel').value;
+  const allowedKeys = keySel==="All Keys" ? DB.keys : [keySel];
+  const allowed = new Set();
+  for(const [ch, combos] of DB.chordIndex.entries()){
+    for(const combo of combos){
+      const [k] = combo.split("||");
+      if(allowedKeys.includes(k)){ allowed.add(ch); break; }
+    }
+  }
+  const startSel = document.getElementById('startSel');
+  const vals = ["(none)", ...Array.from(allowed).sort()];
+  startSel.innerHTML = vals.map(v=>`<option>${v}</option>`).join("");
+}
+
+function updateSelectors(){
+  const rootSel = document.getElementById('rootSel');
+  rootSel.innerHTML = `<option>All Keys</option>` + DB.keys.map(k=>`<option>${k}</option>`).join("");
+
+  document.getElementById('baseSel').innerHTML = `<option>All Base Modes</option>`;
+  document.getElementById('subSel').innerHTML  = `<option>All Sub Modes</option>`;
+  refreshStartChoices();
+}
+
+function onRootChange(){
+  const key = document.getElementById('rootSel').value;
+  if(key==="All Keys"){
+    document.getElementById('baseSel').innerHTML = `<option>All Base Modes</option>`;
+    document.getElementById('subSel').innerHTML  = `<option>All Sub Modes</option>`;
+  } else {
+    const bases = Object.keys(DB.data[key]||{}).sort();
+    document.getElementById('baseSel').innerHTML = `<option>All Base Modes</option>` + bases.map(b=>`<option>${b}</option>`).join("");
+    document.getElementById('subSel').innerHTML  = `<option>All Sub Modes</option>`;
+  }
+  refreshStartChoices();
+  renderCards([]);
+}
+function onBaseChange(){
+  const key = document.getElementById('rootSel').value;
+  const base= document.getElementById('baseSel').value;
+  if(key==="All Keys" || base==="All Base Modes"){
+    document.getElementById('subSel').innerHTML  = `<option>All Sub Modes</option>`;
+  } else {
+    const subs = Object.keys((DB.data[key]||{})[base]||{}).sort();
+    document.getElementById('subSel').innerHTML  = `<option>All Sub Modes</option>` + subs.map(s=>`<option>${s}</option>`).join("");
+  }
+  refreshStartChoices();
+  renderCards([]);
+}
+function onStartChange(){ refreshStartChoices(); }
+
+// ------------ Audio (WebAudio) ------------
+let audioCtx = null;
+function ensureAudio(){
+  if(!audioCtx){ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }
+  if(audioCtx.state === 'suspended'){ audioCtx.resume(); }
+  return audioCtx;
+}
+function playChord(notes, gain=0.45, seconds=0.9){
+  const ctx = ensureAudio();
+  const now = ctx.currentTime + 0.01;
+  const master = ctx.createGain();
+  master.connect(ctx.destination);
+  master.gain.value = Math.max(0,Math.min(1,gain));
+
+  const baseMidi = 48;
+  for(const x of notes){
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    const hz = 440 * Math.pow(2, ((baseMidi + (x%12)) - 69)/12);
+    osc.frequency.value = hz;
+    osc.type = 'sine';
+    osc.connect(g); g.connect(master);
+    const a = 0.02, r = 0.15;
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(1, now+a);
+    g.gain.setValueAtTime(1, now+seconds-r);
+    g.gain.linearRampToValueAtTime(0, now+seconds);
+    osc.start(now);
+    osc.stop(now+seconds+0.02);
+  }
+}
+
+// ------------ MIDI (very small SMF writer) ------------
+function writeVarLen(n){ const out=[]; let buffer = n & 0x7F; while((n >>=7)){ buffer <<=8; buffer |= ((n & 0x7F)|0x80); } while(true){ out.push(buffer&0xFF); if(buffer & 0x80){ buffer >>=8; } else break; } return out; }
+function chordToMIDI(notes){
+  const base = 60;
+  const on=[];
+  for(const x of notes){
+    const pitch = base + (x%12);
+    on.push(0x90, pitch, 90);
+  }
+  const track = [];
+  for(let i=0;i<on.length;i+=3){ track.push(0x00, on[i], on[i+1], on[i+2]); }
+  const delta = writeVarLen(480);
+  for(const x of notes){
+    const pitch = base + (x%12);
+    track.push(...delta, 0x80, pitch, 64);
+  }
+  track.push(0x00, 0xFF, 0x2F, 0x00);
+  const header = new Uint8Array([
+    0x4d,0x54,0x68,0x64, 0x00,0x00,0x00,0x06, 0x00,0x00, 0x00,0x01, 0x01,0xE0,
+  ]);
+  const len = track.length;
+  const lenBytes = new Uint8Array([(len>>>24)&255,(len>>>16)&255,(len>>>8)&255,len&255]);
+  const chunk = new Uint8Array([0x4d,0x54,0x72,0x6b, ...lenBytes, ...track]);
+  return new Blob([header, chunk], {type:"audio/midi"});
+}
+
+// ------------ Rows logic & generation ------------
+function sampleChords(){
+  const key = document.getElementById('rootSel').value;
+  const base= document.getElementById('baseSel').value;
+  const sub = document.getElementById('subSel').value;
+  const n   = Math.max(1, Math.min(16, parseInt(document.getElementById('count').value||"8")));
+  const rowsEnabled = document.getElementById('rowsEnable').checked;
+  const level = parseInt(document.getElementById('rows').value||"1");
+  const start = document.getElementById('startSel').value;
+  const startOpt = (!start || start== "(none)") ? null : start;
+
+  const pool = poolFor(key, base, sub);
+  const buckets = bucketsFor(key, base, sub);
+  if(!pool.length) return [];
+
+  let seq = [];
+  if(rowsEnabled && buckets.length){
+    let homeIdx = null;
+    if(startOpt){
+      for(let i=0;i<buckets.length;i++){ if(buckets[i].includes(startOpt)){ homeIdx = i; break; } }
+    }
+    if(homeIdx==null){
+      homeIdx = buckets.reduce((best,i,idx)=> (buckets[idx].length > buckets[best].length ? idx : best), 0);
+    }
+    const home = buckets[homeIdx];
+    const outsidersAllowed = Math.max(0, level-1);
+    if(startOpt && pool.includes(startOpt)) seq.push(startOpt);
+    let outsidersUsed = 0;
+    while(seq.length < n){
+      let pick = null;
+      const homeAvail = home.filter(c=>!seq.includes(c));
+      if(homeAvail.length) pick = homeAvail[Math.floor(Math.random()*homeAvail.length)];
+      if((pick==null || Math.random() < (outsidersAllowed/12)) && outsidersUsed < outsidersAllowed){
+        const outside = buckets.flatMap((r,i)=> i===homeIdx?[]:r).filter(c=>!seq.includes(c));
+        if(outside.length){ pick = outside[Math.floor(Math.random()*outside.length)]; outsidersUsed++; }
+      }
+      if(pick==null){
+        const rest = pool.filter(c=>!seq.includes(c));
+        if(!rest.length) break;
+        pick = rest[Math.floor(Math.random()*rest.length)];
+      }
+      if(seq.at(-1)===pick) continue;
+      seq.push(pick);
+    }
+  } else {
+    if(startOpt && pool.includes(startOpt)){
+      const wo = pool.filter(c=>c!==startOpt);
+      const take = Math.max(0, Math.min(n-1, wo.length));
+      seq = [startOpt, ...shuffle(wo).slice(0, take)];
+    } else {
+      seq = shuffle(pool).slice(0, Math.min(n, pool.length));
+    }
+  }
+  return seq;
+}
+function shuffle(a){ const arr=a.slice(); for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
+
+// ------------ Rendering ------------
+let CURRENT = [];
+function renderCards(chords){
+  CURRENT = chords.slice();
+  const cont = document.getElementById('cards');
+  cont.innerHTML = "";
+  const vol = Math.max(0, Math.min(1, (parseInt(document.getElementById('vol').value||"45")/100)));
+  chords.forEach((ch, i)=>{
+    const p = parseLabel(ch); if(!p) return;
+    const [root, qual] = p;
+    const [notes, rootSemi] = build7th(root, qual);
+
+    const card = document.createElement('div'); card.className="card";
+    const meta = document.createElement('div');
+    meta.style.flex="0 0 120px";
+    meta.innerHTML = `<h3>#${i+1}</h3><div>${escapeHTML(canonicalize(ch))}</div>`;
+    const img = document.createElement('div'); img.className="img";
+    img.appendChild(drawKeyboard(notes, rootSemi));
+    const ctrls = document.createElement('div'); ctrls.className="ctrls";
+    const playBtn = document.createElement('button'); playBtn.textContent="▶️ Play"; playBtn.onclick=()=>playChord(notes, vol);
+    const regenBtn = document.createElement('button'); regenBtn.textContent="🌀 Regen"; regenBtn.onclick=()=>{ CURRENT[i] = sampleReplacement(i); renderCards(CURRENT); };
+    const midiBtn = document.createElement('button'); midiBtn.textContent="🎹 MIDI"; midiBtn.onclick=()=>{
+      const blob = chordToMIDI(notes);
+      const a = document.createElement('a');
+      const safe = ch.replace(/[^A-Za-z0-9_\-]+/g,'_').replace(/^_+|_+$/g,'');
+      a.href = URL.createObjectURL(blob);
+      a.download = safe + ".mid";
+      a.click();
+      setTimeout(()=>URL.revokeObjectURL(a.href), 1500);
+    };
+    ctrls.append(playBtn, regenBtn, midiBtn);
+    card.append(meta, img, ctrls);
+    cont.appendChild(card);
+  });
+}
+function sampleReplacement(index){
+  const key = document.getElementById('rootSel').value;
+  const base= document.getElementById('baseSel').value;
+  const sub = document.getElementById('subSel').value;
+  const pool = poolFor(key, base, sub);
+  const existing = new Set(CURRENT);
+  const options = pool.filter(c=>!existing.has(c));
+  return (options.length? options[Math.floor(Math.random()*options.length)] : pool[Math.floor(Math.random()*pool.length)]);
+}
+
+// ---------- Drawing keyboard (fixed orientation) ----------
+function drawKeyboard(notes, rootSemi){
+  const onset = new Set(notes.map(n=>((n%12)+12)%12));
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNS,"svg");
+  const W=420,H=110; svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+
+  const whites=[]; let count=0; let midi=48;
+  while(count<22){ if(![1,3,6,8,10].includes(midi%12)){ whites.push(midi); count++; } midi++; }
+  const whiteW = W/22;
+
+  whites.forEach((m,idx)=>{
+    const on = onset.has(m%12);
+    const r = document.createElementNS(svgNS,"rect");
+    r.setAttribute("x", idx*whiteW); r.setAttribute("y",0);
+    r.setAttribute("width", whiteW); r.setAttribute("height", H);
+    r.setAttribute("fill", on ? "#86efac" : "#ffffff");
+    r.setAttribute("stroke", "#222");
+    svg.appendChild(r);
+  });
+
+  const blacks=[];
+  for(let n=48;n<48+36;n++){
+    const s=n%12;
+    if([1,3,6,8,10].includes(s)){ if(whites.some(w=> w<n && (w+2)>n)) blacks.push(n); }
+  }
+  blacks.forEach((m)=>{
+    const wi = whites.findIndex(w=>w>m) - 1;
+    const x = wi*whiteW + whiteW*0.65;
+    const on = onset.has(m%12);
+    const r = document.createElementNS(svgNS,"rect");
+    r.setAttribute("x", x); r.setAttribute("y", 0);
+    r.setAttribute("width", whiteW*0.6); r.setAttribute("height", H*0.65);
+    r.setAttribute("fill", on ? "#86efac" : "#111");
+    r.setAttribute("stroke", "#222");
+    r.setAttribute("stroke-width", "1");
+    r.setAttribute("rx", "2"); r.setAttribute("ry", "2");
+    svg.appendChild(r);
+  });
+
+  whites.forEach((m,idx)=>{
+    if(rootSemi!=null && (m%12)===((rootSemi%12)+12)%12){
+      const c = document.createElementNS(svgNS,"circle");
+      c.setAttribute("cx", idx*whiteW + whiteW/2);
+      c.setAttribute("cy", H-14);
+      c.setAttribute("r", 7);
+      c.setAttribute("fill", "#2563eb");
+      svg.appendChild(c);
+    }
+  });
+  blacks.forEach((m)=>{
+    if(rootSemi!=null && (m%12)===((rootSemi%12)+12)%12){
+      const wi = whites.findIndex(w=>w>m) - 1;
+      const x = wi*whiteW + whiteW*0.65;
+      const c = document.createElementNS(svgNS,"circle");
+      c.setAttribute("cx", x + whiteW*0.3);
+      c.setAttribute("cy", H*0.65 - 10);
+      c.setAttribute("r", 6);
+      c.setAttribute("fill", "#2563eb");
+      svg.appendChild(c);
+    }
+  });
+
+  return svg;
+}
+function escapeHTML(s){return (s||"").replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));}
+
+// ------------ Wire up UI ------------
+function setNotice(msg){ document.getElementById('notice').textContent = msg||""; }
+document.getElementById('themeBtn').onclick=()=>{
+  const app = document.getElementById('app');
+  const isLight = app.getAttribute('data-theme')==='light';
+  app.setAttribute('data-theme', isLight ? 'dark' : 'light');
+};
+['rootSel','baseSel','subSel'].forEach(id=> document.getElementById(id).onchange = (id==='rootSel'?onRootChange:(id==='baseSel'?onBaseChange:()=>{})));
+document.getElementById('startSel').onchange = onStartChange;
+document.getElementById('gen').onclick = ()=>{ const seq = sampleChords(); if(!seq.length) setNotice("No chords found for this selection."); else setNotice(""); renderCards(seq); };
+document.getElementById('randAll').onclick = ()=>{
+  const k = DB.keys[Math.floor(Math.random()*DB.keys.length)]; if(!k) return;
+  document.getElementById('rootSel').value = k; onRootChange();
+  const bases = Object.keys(DB.data[k]||{}); const b = bases[Math.floor(Math.random()*bases.length)];
+  document.getElementById('baseSel').value = b; onBaseChange();
+  const subs = Object.keys((DB.data[k]||{})[b]||{}); const s = subs[Math.floor(Math.random()*subs.length)];
+  document.getElementById('subSel').value = s;
+  refreshStartChoices();
+  const rows = (DB.data[k]||{})[b]?.[s] || [];
+  const all = rows.flat().filter(Boolean);
+  document.getElementById('startSel').value = all.length ? all[Math.floor(Math.random()*all.length)] : "(none)";
+};
+['rootRnd','baseRnd','subRnd','startRnd'].forEach(id=>{
+  document.getElementById(id).onclick = ()=>{
+    if(id==='rootRnd'){ const arr=DB.keys; if(arr.length){ document.getElementById('rootSel').value = arr[Math.floor(Math.random()*arr.length)]; onRootChange(); } }
+    if(id==='baseRnd'){ const k=document.getElementById('rootSel').value; const arr = (k==="All Keys")?[]:Object.keys(DB.data[k]||{}); if(arr.length){ document.getElementById('baseSel').value = arr[Math.floor(Math.random()*arr.length)]; onBaseChange(); } }
+    if(id==='subRnd'){ const k=document.getElementById('rootSel').value; const b=document.getElementById('baseSel').value; const arr=(k==="All Keys"||b==="All Base Modes")?[]:Object.keys((DB.data[k]||{})[b]||{}); if(arr.length){ document.getElementById('subSel').value = arr[Math.floor(Math.random()*arr.length)]; refreshStartChoices(); } }
+    if(id==='startRnd'){ const opt = document.getElementById('startSel'); if(opt.options.length>1){ opt.selectedIndex = 1 + Math.floor(Math.random()*(opt.options.length-1)); } }
+  };
+});
+document.getElementById('copy').onclick = async ()=>{
+  const txt = CURRENT.join(', ');
+  try{ await navigator.clipboard.writeText(txt); setNotice("Copied: "+txt); setTimeout(()=>setNotice(""), 2000); }
+  catch(e){ setNotice("Copy failed: "+e); }
+};
+
+document.getElementById('file').onchange = async (e)=>{
+  const f = e.target.files[0]; if(!f) return;
+  const name = (f.name||"").toLowerCase();
+  DB.keys=[]; DB.data={}; DB.chordIndex=new Map(); DB.allChords=[]; DB.stats={sheets:0, rows:0, rowsUsed:0, chords:0};
+  try{
+    if(name.endsWith(".xlsx") || name.endsWith(".xls")){
+      const ab = await f.arrayBuffer();
+      const wb = XLSX.read(ab, { type:'array' });
+      ingestXLSX(wb);
+      updateSelectors(); setNotice(DB.allChords.length ? "XLSX loaded ✔" : "Parsed XLSX but found no valid chords. Check Stats.");
+    } else if(name.endsWith(".csv")){
+      const text = await f.text();
+      const rows = parseCSV(text);
+      ingestRows(rows);
+      updateSelectors(); setNotice(DB.allChords.length ? "CSV loaded ✔" : "Parsed CSV but found no valid chords. Check Stats.");
+    } else {
+      setNotice("Unsupported file type. Use .xlsx or .csv");
+      return;
+    }
+    renderCards([]);
+    renderStats();
+  } catch(err){
+    console.error(err);
+    setNotice("Failed to parse file: "+err);
+  }
+};
+
+document.getElementById('showStats').onclick = ()=>{
+  const box = document.getElementById('statsBox');
+  box.style.display = 'block';
+  box.open = true;
+  renderStats();
+};
+function renderStats(){
+  const s = DB.stats || {};
+  const keys = DB.keys || [];
+  const lines = [];
+  lines.push(`Sheets: ${s.sheets||0}`);
+  lines.push(`Rows scanned: ${s.rows||0}`);
+  lines.push(`Rows used (with valid chords): ${s.rowsUsed||0}`);
+  lines.push(`Valid chords indexed: ${s.chords||0}`);
+  lines.push(`Keys detected: ${keys.length ? keys.join(', ') : '(none)'}`);
+  document.getElementById('stats').textContent = lines.join('\n');
+  const box = document.getElementById('statsBox'); box.style.display = 'block';
+}
+
+// ---------- Auto-load from URL / same-folder data.xlsx ----------
+async function loadXLSXFromURL(url){
+  try{
+    setNotice("Loading from URL…");
+    const res = await fetch(url, {cache:"no-store"});
+    if(!res.ok){ throw new Error("HTTP "+res.status); }
+    const ab = await res.arrayBuffer();
+    const wb = XLSX.read(ab, {type:"array"});
+    DB.keys=[]; DB.data={}; DB.chordIndex=new Map(); DB.allChords=[]; DB.stats={sheets:0, rows:0, rowsUsed:0, chords:0};
+    ingestXLSX(wb);
+    updateSelectors();
+    renderCards([]);
+    renderStats();
+    setNotice(DB.allChords.length ? "Loaded from URL ✔" : "Loaded from URL but found no valid chords. Check Stats.");
+  } catch(e){
+    console.error(e);
+    setNotice("Failed to load from URL: "+e.message);
+  }
+}
+document.getElementById('loadUrl').onclick = ()=>{
+  const u = document.getElementById('urlBox').value.trim();
+  if(u) loadXLSXFromURL(u);
+};
+
+function getQueryParam(name){
+  const url = new URL(window.location.href);
+  return url.searchParams.get(name);
+}
+
+window.addEventListener('load', async ()=>{
+  const qp = getQueryParam('xlsx');
+  if(qp){
+    document.getElementById('urlBox').value = qp;
+    await loadXLSXFromURL(qp);
+    return;
+  }
+  // try same-folder data.xlsx
+  try{
+    const base = new URL(window.location.href);
+    const guess = new URL('data.xlsx', base).href;
+    const res = await fetch(guess, {method:'HEAD', cache:'no-store'});
+    if(res.ok){
+      document.getElementById('urlBox').value = guess;
+      await loadXLSXFromURL(guess);
+    }
+  } catch(e){
+    // ignore
+  }
+});
+</script>
+</body>
+</html>
