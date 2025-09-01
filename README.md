@@ -18,3 +18,7 @@ G = generate
 U = undo
 
 R and 1-8 = regen specific chord
+
+NEW:
+
+HTML page demo: https://santismo.github.io/ChordWeb/
