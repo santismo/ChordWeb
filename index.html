@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -10,7 +10,12 @@
     --bg:#0f172a; --fg:#e5e7eb; --card:#111827; --border:#374151;
     --accent:#2563eb; --muted:#94a3b8;
   }
-  [data-theme="light"]{ --bg:#f8fafc; --fg:#0f172a; --card:#f9fafb; --border:#e5e7eb; }
+  :root[data-theme="light"]{
+  --bg:#f8fafc;
+  --fg:#0f172a;
+  --card:#f9fafb;
+  --border:#e5e7eb;
+}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
   .wrap{max-width:980px;margin:0 auto;padding:12px}
   header{display:flex;align-items:center;gap:10px}
@@ -41,7 +46,7 @@
 </style>
 </head>
 <body>
-<div class="wrap" id="app" data-theme="dark">
+<div class="wrap" id="app">
   <header>
     <h1>ChordWeb </h1>
     <button id="themeBtn" class="iconbtn" title="Toggle theme">🌙</button>
@@ -620,10 +625,12 @@ function escapeHTML(s){return (s||"").replace(/[&<>"']/g, m=>({"&":"&amp;","<":"
 
 // ------------ Wire up UI ------------
 function setNotice(msg){ document.getElementById('notice').textContent = msg||""; }
-document.getElementById('themeBtn').onclick=()=>{
-  const app = document.getElementById('app');
-  const isLight = app.getAttribute('data-theme')==='light';
-  app.setAttribute('data-theme', isLight ? 'dark' : 'light');
+document.getElementById('themeBtn').onclick = () => {
+  const root = document.documentElement; // <html>
+  const isLight = root.getAttribute('data-theme') === 'light';
+  root.setAttribute('data-theme', isLight ? 'dark' : 'light');
+  // optional: flip the icon
+  document.getElementById('themeBtn').textContent = isLight ? '🌙' : '☀️';
 };
 ['rootSel','baseSel','subSel'].forEach(id=> document.getElementById(id).onchange = (id==='rootSel'?onRootChange:(id==='baseSel'?onBaseChange:()=>{})));
 document.getElementById('startSel').onchange = onStartChange;
