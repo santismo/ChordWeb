@@ -1,15 +1,10 @@
 # ChordWeb
 
-A Chordal/Modal-Interchange-Modulation-Matrix/Nexus/Net/Web
-
-A method to modulate between chords that uses a curated dataset or chords organized by modes and submode families to generate interesting theoretical chord progressions or modulations.
-
-Google collab and Python example available for download to demonstate applciation of theory.
-XLSX with chord family dataset required for demos.
+A new way to understand modulations between chords.
 
 More explanations to come.
 
-.Py controls:
+Controls for html and py versions:
 
 1-8 = play chords
 
