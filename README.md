@@ -1,4 +1,4 @@
-# ChordWeb
+# ChordWeb 🎹 🕸️
 
 A new way to understand modulations between chords.
 
