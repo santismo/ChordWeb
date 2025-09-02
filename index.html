@@ -400,7 +400,7 @@ function playChord(notes, gain=0.45, seconds=0.9){
   master.connect(ctx.destination);
 
   const n = notes.length;
-  const baseMidi = 48;
+  const baseMidi = 60;
   const perVoice = 0.6 / Math.sqrt(n);
 
   // ADSR
