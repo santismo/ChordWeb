@@ -101,7 +101,7 @@
         <g id="pulseG"></g>
       </g>
     </svg>
-    <div class="small"> Hotkeys: **G** (generate), **R** (reset), **1–8** (play).</div>
+    <div class="small"> Hotkeys: G (generate), R (reset), 1–8 (play).</div>
   </div>
 </div>
 <div id="tip" class="tooltip"></div>
@@ -133,10 +133,13 @@
 const normLabel = s => (s||"").replace(/\s+/g,' ').trim();
 
 /* ===== Music helpers ===== */
-const noteToSemi={"C":0,"B#":0,"C#":1,"Db":1,"D":2,"D#":3,"Eb":3,"E":4,"Fb":4,"F":5,"E#":5,"F#":6,"Gb":6,"G":7,"G#":8,"Ab":8,"A":9,"A#":10,"Bb":10,"B":11,"Cb":11};
-const CANON={0:'C',1:'C#',2:'D',3:'Eb',4:'E',5:'F',6:'F#',7:'G',8:'Ab',9:'A',10:'Bb',11:'B'};
-const MODE_ORDER=["Ionian","Dorian","Phrygian","Lydian","Mixolydian","Aeolian","Locrian"];
-const MODE_STEPS={
+const noteToSemi = {
+  "C":0,"B#":0,"C#":1,"Db":1,"D":2,"D#":3,"Eb":3,"E":4,"Fb":4,"F":5,"E#":5,
+  "F#":6,"Gb":6,"G":7,"G#":8,"Ab":8,"A":9,"A#":10,"Bb":10,"B":11,"Cb":11
+};
+const CANON = {0:'C',1:'C#',2:'D',3:'Eb',4:'E',5:'F',6:'F#',7:'G',8:'Ab',9:'A',10:'Bb',11:'B'};
+const MODE_ORDER = ["Ionian","Dorian","Phrygian","Lydian","Mixolydian","Aeolian","Locrian"];
+const MODE_STEPS = {
   ionian:[0,2,4,5,7,9,11],
   dorian:[0,2,3,5,7,9,10],
   phrygian:[0,1,3,5,7,8,10],
@@ -145,8 +148,26 @@ const MODE_STEPS={
   aeolian:[0,2,3,5,7,8,10],
   locrian:[0,1,3,5,6,8,10],
 };
-const rand=n=>Math.floor(Math.random()*n);
-const romanRe=/^[b♭]?(?:I|II|III|IV|V|VI|VII)°?$/i;
+
+/* === Key ordering helpers (top-level) === */
+function keySemitone(K){
+  const k = (K || "").trim();
+  if (Object.prototype.hasOwnProperty.call(noteToSemi, k)) return noteToSemi[k];
+  const t = k.replace(/[^A-G#b]/gi, "");
+  return noteToSemi[t] ?? 0;
+}
+function sortKeysChromatic(arr, start='C'){
+  const s = keySemitone(start);
+  return arr.slice().sort((a,b)=>{
+    const da = (keySemitone(a) - s + 12) % 12;
+    const db = (keySemitone(b) - s + 12) % 12;
+    return da - db;
+  });
+}
+
+const rand = n => Math.floor(Math.random()*n);
+const romanRe = /^[b♭]?(?:I|II|III|IV|V|VI|VII)°?$/i;
+
 /* parsing */
 function parseLabel(s){
   const parts=(s||"").trim().split(/\s+/);
@@ -167,6 +188,14 @@ function build7th(root,quality){
 }
 function chordPCSet(label){ const p=parseLabel(label); if(!p) return new Set(); const [r,q]=p; const [ns]=build7th(r,q); return new Set(ns.map(n=>((n%12)+12)%12)); }
 function jaccard(A,B){ let i=0; for(const x of A){ if(B.has(x)) i++; } const u=A.size+B.size-i; return u? i/u : 0; }
+
+/* ===== Families for a (root, base) in modal order ===== */
+function familiesFor(rootKey, base){
+  const baseName = (base || "Ionian").replace(/^[A-G](?:#|b)?\s+/, ""); // "C Ionian" -> "Ionian"
+  const steps = MODE_STEPS[(baseName || "ionian").toLowerCase()] || MODE_STEPS.ionian;
+  const R = noteToSemi[rootKey] ?? 0;
+  return steps.map(d => `${CANON[(R + d + 1200) % 12]} ${baseName}`);
+}
 
 /* ===== Data model =====
    DB.data[key][base][sub] = [{family: <col D>, degrees: [E..K]}...] */
@@ -267,10 +296,26 @@ function refreshStartChoices(){
 
 /* ===== Families for a (root, base) in modal order ===== */
 function familiesFor(rootKey, base){
-  const baseName=(base||"Ionian").replace(/^[A-G](?:#|b)?\s+/,""); // "C Ionian" -> "Ionian"
-  const steps=MODE_STEPS[(baseName||"ionian").toLowerCase()]||MODE_STEPS.ionian;
-  const R=noteToSemi[rootKey]??0;
-  return steps.map(d=> `${CANON[(R+d+1200)%12]} ${baseName}`);
+  const baseName = (base || "Ionian").replace(/^[A-G](?:#|b)?\s+/, ""); // "C Ionian" -> "Ionian"
+  const steps = MODE_STEPS[(baseName || "ionian").toLowerCase()] || MODE_STEPS.ionian;
+  const R = noteToSemi[rootKey] ?? 0;
+  return steps.map(d => `${CANON[(R + d + 1200) % 12]} ${baseName}`);
+}
+
+  /* === Key ordering helpers === */
+function keySemitone(K){
+  const k = (K||"").trim();
+  if (noteToSemi.hasOwnProperty(k)) return noteToSemi[k];
+  const t = k.replace(/[^A-G#b]/gi,"");
+  return noteToSemi[t] ?? 0;
+}
+function sortKeysChromatic(arr, start='C'){
+  const s = keySemitone(start);
+  return arr.slice().sort((a,b)=>{
+    const da = (keySemitone(a) - s + 12) % 12;
+    const db = (keySemitone(b) - s + 12) % 12;
+    return da - db;
+  });
 }
 
 /* ===== Sampling ===== */
@@ -350,30 +395,82 @@ function playChord(notes,gain=0.45,seconds=0.9){
 }
 function drawKeys(notes, rootPC){
   const onset=new Set((notes||[]).map(n=>((n%12)+12)%12));
-  const NS="http://www.w3.org/2000/svg", W=420,H=110, svg=document.createElementNS(NS,"svg");
+  const NS="http://www.w3.org/2000/svg", W=420,H=110;
+  const svg=document.createElementNS(NS,"svg");
   svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
-  const whites=[]; let count=0, midi=48; while(count<22){ if(![1,3,6,8,10].includes(midi%12)){ whites.push(midi); count++; } midi++; }
+
+  // Build a lightweight key map so we know where BOTH white and black keys are
+  const keys=[]; // {midi, pc, isBlack, x, w}
+
+  // --- Whites ---
+  const whites=[]; let count=0, midi=48; // start at C3
+  while(count<22){
+    const pc = ((midi%12)+12)%12;
+    if(![1,3,6,8,10].includes(pc)){ // not a black pitch class
+      whites.push(midi);
+      count++;
+    }
+    midi++;
+  }
   const ww=W/22;
-  whites.forEach((m,i)=>{ const r=document.createElementNS(NS,"rect"); r.setAttribute("x",i*ww); r.setAttribute("y",0);
-    r.setAttribute("width",ww); r.setAttribute("height",H); r.setAttribute("fill", onset.has(m%12)?"#86efac":"#ffffff"); r.setAttribute("stroke","#222"); svg.appendChild(r); });
-  const blacks=[]; for(let n=48;n<48+36;n++){ const s=n%12; if([1,3,6,8,10].includes(s)){ if(whites.some(w=> w<n && (w+2)>n)) blacks.push(n); } }
-  blacks.forEach(m=>{ const wi=whites.findIndex(w=>w>m)-1; const x=wi*ww+ww*0.65; const r=document.createElementNS(NS,"rect");
-    r.setAttribute("x",x); r.setAttribute("y",0); r.setAttribute("width",ww*0.6); r.setAttribute("height",H*0.65);
-    r.setAttribute("fill", onset.has(m%12)?"#86efac":"#111"); r.setAttribute("stroke","#222"); r.setAttribute("rx","2"); r.setAttribute("ry","2"); svg.appendChild(r); });
-  const rootWhiteIndex = whites.findIndex(m=> (m%12)===((rootPC%12+12)%12) );
-  if(rootWhiteIndex>=0){
-    const cx = rootWhiteIndex*ww + ww/2;
-    const cy = H - 8;
+
+  whites.forEach((m,i)=>{
+    const pc=((m%12)+12)%12;
+    const x=i*ww;
+    const r=document.createElementNS(NS,"rect");
+    r.setAttribute("x",x); r.setAttribute("y",0);
+    r.setAttribute("width",ww); r.setAttribute("height",H);
+    r.setAttribute("fill", onset.has(pc) ? "#86efac" : "#ffffff");
+    r.setAttribute("stroke","#222");
+    svg.appendChild(r);
+    keys.push({midi:m, pc, isBlack:false, x, w:ww});
+  });
+
+  // --- Blacks ---
+  for(let n=48;n<48+36;n++){
+    const pc=((n%12)+12)%12;
+    if([1,3,6,8,10].includes(pc)){
+      // place between its surrounding whites
+      const wi = whites.findIndex(w=>w>n) - 1;
+      if(wi>=0){
+        const x = wi*ww + ww*0.65;
+        const r=document.createElementNS(NS,"rect");
+        r.setAttribute("x",x); r.setAttribute("y",0);
+        r.setAttribute("width",ww*0.6); r.setAttribute("height",H*0.65);
+        r.setAttribute("fill", onset.has(pc) ? "#86efac" : "#111");
+        r.setAttribute("stroke","#222");
+        r.setAttribute("rx","2"); r.setAttribute("ry","2");
+        svg.appendChild(r);
+        keys.push({midi:n, pc, isBlack:true, x, w:ww*0.6});
+      }
+    }
+  }
+
+  // --- Root dot (works for both white & black roots) ---
+  const rpc = ((rootPC%12)+12)%12;
+  const candidates = keys.filter(k => k.pc===rpc);
+  if(candidates.length){
+    // pick the visually most central instance of that pitch class
+    const center = W/2;
+    candidates.sort((a,b)=>Math.abs((a.x+a.w/2)-center) - Math.abs((b.x+b.w/2)-center));
+    const k0 = candidates[0];
+    const cx = k0.x + k0.w/2;
+    const cy = k0.isBlack ? (H*0.22) : (H-8); // higher for black keys so it's visible
     const dot=document.createElementNS(NS,"circle");
-    dot.setAttribute("cx",cx); dot.setAttribute("cy",cy); dot.setAttribute("r",5);
-    dot.setAttribute("fill","#60a5fa"); dot.setAttribute("stroke","#1e3a8a"); dot.setAttribute("stroke-width","1.5");
+    dot.setAttribute("cx",cx); dot.setAttribute("cy",cy);
+    dot.setAttribute("r",5);
+    dot.setAttribute("fill","#60a5fa");
+    dot.setAttribute("stroke","#1e3a8a");
+    dot.setAttribute("stroke-width","1.5");
+    dot.setAttribute("pointer-events","none"); // keep tooltip/hover behavior sane
     svg.appendChild(dot);
   }
+
   return svg;
 }
+
 function renderCards(seq){
   CURRENT=seq.slice();
-  // When the chord list changes, reset endpoint choices so new ones can be picked.
   SEL_CHOICE.clear();
   const cont=el('cards'); cont.innerHTML="";
   const vol=parseInt(val('vol'))/100;
@@ -397,14 +494,26 @@ function mk(tag,attr){ const e=document.createElementNS('http://www.w3.org/2000/
 function polar(r,a){ const rad=a*Math.PI/180; return [CX + r*Math.cos(rad), CY + r*Math.sin(rad)]; }
 const baseCols=["#22c55e","#10b981","#06b6d4","#3b82f6","#6366f1","#a855f7","#ef4444"];
 function colorFor(B,S,ri){ if(ri!=null) return ["#7dd3fc","#93c5fd","#a7f3d0","#fde68a","#fca5a5","#c7d2fe","#99f6e4","#fecaca"][ri%8]; return baseCols[Math.max(0,modeRank(B))%baseCols.length]; }
+
+/* ===== CHG: Sub-family palette & helpers (for All Sub Modes coloring) ===== */
+const subCols = ["#ef4444","#f59e0b","#84cc16","#10b981","#06b6d4","#3b82f6","#a855f7"];
+function subFamilyIndex(S){
+  const disp = displaySubLabel(S||"");
+  const head = (disp.split(/\s+/)[0]||"").toLowerCase();
+  const i = MODE_ORDER.findIndex(m => m.toLowerCase()===head);
+  return i>=0 ? i : 0;
+}
+function subFamilyColor(S){ return subCols[subFamilyIndex(S) % subCols.length]; }
+/* ===== end CHG ===== */
+
 function node(title,x,y,r,fill){
   const d=mk('circle',{cx:x,cy:y,r:r,fill:fill||"#93c5fd",stroke:"#0b1220","stroke-width":2,opacity:.98,class:"n","data-tip":title});
   return d;
 }
 
 /* ===== Stable selection endpoints ===== */
-let SEL_POS=new Map();     // label -> {x,y} (rendered each frame)
-let SEL_CHOICE=new Map();  // label -> chosen occurrence index among DB.nodeIndex.get(label)
+let SEL_POS=new Map();     
+let SEL_CHOICE=new Map();  
 function showSelectionOverlay(){
   SEL_POS=new Map();
   while(gSel.firstChild) gSel.removeChild(gSel.firstChild);
@@ -445,6 +554,23 @@ function pulseByLabel(label){
   const e=SEL_POS.get(normLabel(label)) || (DB.nodeIndex.get(normLabel(label))||[])[0]; if(e) pulseAt(e.x,e.y);
 }
 
+/* ===== NEW helper: degrees for a family (any sub of a base) ===== */
+function degreesForFamilyAnySub(K,B,fam){
+  const subs = ((DB.data[K]||{})[B]||{});
+  for(const [S,rows] of Object.entries(subs)){
+    const hit = rows.find(r => normLabel(r.family)===normLabel(fam));
+    if(hit && Array.isArray(hit.degrees) && hit.degrees.length){
+      return {degrees: hit.degrees.map(normLabel), sub:S};
+    }
+  }
+  const entries = Object.entries(subs);
+  if(entries.length && entries[0][1].length && entries[0][1][0].degrees?.length){
+    return {degrees: entries[0][1][0].degrees.map(normLabel), sub: entries[0][0]};
+  }
+  return {degrees: [], sub: ""};
+}
+
+
 /* ===== Main render ===== */
 function render(){
   [gModes,gChart,gSel,gPath,gPulse].forEach(g=>{ while(g.firstChild) g.removeChild(g.firstChild); });
@@ -452,8 +578,12 @@ function render(){
 
   const k=val('rootSel'), b=val('baseSel'), s=val('subSel');
   const nodeR=parseInt(val('nodeR')), gap=parseInt(val('rowGap'));
-  const mini = el('mini').checked, miniBy = el('miniGroup').value; // 'base' | 'sub'
-  const miniSpace = parseInt(val('miniSpace')); // controls cluster separation
+  const mini = el('mini').checked, miniBy = el('miniGroup').value;
+  const miniSpace = parseInt(val('miniSpace'));
+
+  /* ===== CHG: when Sub = All Sub Modes, color by sub-family ===== */
+  const useSubColors = (s === "All Sub Modes");
+  /* ===== end CHG ===== */
 
   const ring0=110, ringSub=ring0+64, ringFam=ringSub+36;
   const a0=-90;
@@ -462,34 +592,61 @@ function render(){
                    (k!=="All Keys" && b!=="All Base Modes" && s==="All Sub Modes") ? 2 :
                    (k!=="All Keys" && b==="All Base Modes" && s==="All Sub Modes") ? 3 : 0;
 
-  let centerLabel = "All Keys";
-  if(scenario===1) centerLabel = displaySubLabel(s);
-  else if(scenario===2) centerLabel = `${k} ${b.replace(/^[A-G](?:#|b)?\s+/,"")}`;
-  else if(scenario===3) centerLabel = k;
-  gModes.appendChild(node(centerLabel, CX, CY, 16, "#fff"));
+let centerLabel = "All Keys";
+if(scenario===1) centerLabel = displaySubLabel(s);
+else if(scenario===2) centerLabel = `${k} ${b.replace(/^[A-G](?:#|b)?\s+/,"")}`;
+else if(scenario===3) centerLabel = k;
+gModes.appendChild(node(centerLabel, CX, CY, 16, "#fff"));
 
-  if(scenario===1){
-    // Specific sub mode
-    const famOrder=familiesFor(k,b);
-    const rows = (((DB.data[k]||{})[b]||{})[s]||[]);
-    const famMap=new Map(); rows.forEach(r=>{ if(r.family) famMap.set(normLabel(r.family), r.degrees.map(normLabel)); });
-    const step=360/7;
-    { const [sx,sy]=polar(ringSub,a0); gModes.appendChild(node(displaySubLabel(s), sx,sy,7, "#93c5fd")); }
-    for(let i=0;i<7;i++){
-      const a=a0 + i*step;
-      const fam=famOrder[i];
-      const [fx,fy]=polar(ringFam,a);
-      gModes.appendChild(node(fam, fx,fy,7, baseCols[i%7]));
-      const degs=famMap.get(normLabel(fam)) || (rows[0]?.degrees||[]).map(normLabel);
-      for(let di=0; di<Math.min(7,degs.length); di++){
-        const [x,y]=polar(ringFam+30+di*gap, a);
-        const lab=normLabel(degs[di]);
-        const d=node(lab,x,y,nodeR, colorFor(b,s,di));
-        gChart.appendChild(d);
-        (DB.nodeIndex.get(lab) || DB.nodeIndex.set(lab,[]), DB.nodeIndex.get(lab)).push({x,y});
-      }
+if(scenario===1){
+  // Specific sub mode
+  const famOrder=familiesFor(k,b);
+  const rows = (((DB.data[k]||{})[b]||{})[s]||[]);
+  const famMap=new Map(); rows.forEach(r=>{ if(r.family) famMap.set(normLabel(r.family), r.degrees.map(normLabel)); });
+  const step=360/7;
+  { const [sx,sy]=polar(ringSub,a0); gModes.appendChild(node(displaySubLabel(s), sx,sy,7, "#93c5fd")); }
+  for(let i=0;i<7;i++){
+    const a=a0 + i*step;
+    const fam=famOrder[i];
+    const [fx,fy]=polar(ringFam,a);
+    gModes.appendChild(node(fam, fx,fy,7, baseCols[i%7]));
+    const degs=famMap.get(normLabel(fam)) || (rows[0]?.degrees||[]).map(normLabel);
+    for(let di=0; di<Math.min(7,degs.length); di++){
+      const [x,y]=polar(ringFam+30+di*gap, a);
+      const lab=normLabel(degs[di]);
+      const d=node(lab,x,y,nodeR, colorFor(b,s,di));
+      gChart.appendChild(d);
+      (DB.nodeIndex.get(lab) || DB.nodeIndex.set(lab,[]), DB.nodeIndex.get(lab)).push({x,y});
     }
   }
+
+  // --- NEW: endpoints for all selected chords (even if degree index > 7) ---
+  // Build label -> {fi (family index 0..6), di (degree index)} for this submode
+  const LIDX = new Map();
+  rows.forEach(r=>{
+    const famName = normLabel(r.family||"");
+    const fiRaw = famOrder.findIndex(f => normLabel(f) === famName);
+    const fi = fiRaw >= 0 ? fiRaw : 0;
+    (r.degrees||[]).forEach((d,di)=>{
+      LIDX.set(normLabel(d), { fi, di });
+    });
+  });
+
+  (CURRENT||[]).forEach(o=>{
+    const lab = normLabel(o.label);
+    if(!DB.nodeIndex.has(lab) && LIDX.has(lab)){
+      const { fi, di } = LIDX.get(lab);
+      const a  = a0 + fi*step;
+      const rr = ringFam + 30 + di*gap; // true ring position for this degree index
+      const [x,y] = polar(rr, a);
+      const d = node(lab, x, y, nodeR, colorFor(b, s, di));
+      gChart.appendChild(d);
+      (DB.nodeIndex.get(lab) || DB.nodeIndex.set(lab,[]), DB.nodeIndex.get(lab)).push({x,y});
+    }
+  });
+  // --- END NEW ---
+}
+
   else if(scenario===2){
     // Specific base (All Subs)
     const subsUnique = uniqueSubsForBase(k,b); // de-dup display
@@ -501,13 +658,15 @@ function render(){
         const S=obj.value, Slabel=obj.disp;
         const a=a0+si*step; const [cx,cy]=polar(ringCluster,a);
         // center label: the Sub once (no spam)
-        gModes.appendChild(node(Slabel, cx, cy, 7.2, "#a78bfa"));
+        gModes.appendChild(node(Slabel, cx, cy, 7.2, useSubColors ? subFamilyColor(S) : "#a78bfa")); // CHG
+
         const rows = (((DB.data[k]||{})[b]||{})[S]||[]);
         const famOrder=familiesFor(k,b);
         const famMap=new Map(); rows.forEach(r=>{ if(r.family) famMap.set(normLabel(r.family), r.degrees.map(normLabel)); });
+
         // families around sub center
         for(let fi=0; fi<7; fi++){
-          const aa = (a-90) + fi*(360/Math.max(7,7)); // equal wedges inside the cluster
+          const aa = (a-90) + fi*(360/Math.max(7,7));
           const [fx,fy]=[ cx + Math.cos(aa*Math.PI/180)*74, cy + Math.sin(aa*Math.PI/180)*74 ];
           gModes.appendChild(node(famOrder[fi], fx,fy,6, baseCols[fi%7]));
           const degs=famMap.get(normLabel(famOrder[fi])) || (rows[fi]?.degrees||rows[0]?.degrees||[]).map(normLabel);
@@ -515,7 +674,7 @@ function render(){
             const rr = 74 + 20 + di*(gap*0.75);
             const [x,y]=[ cx + Math.cos(aa*Math.PI/180)*rr, cy + Math.sin(aa*Math.PI/180)*rr ];
             const lab=normLabel(degs[di]);
-            const d=node(lab,x,y,nodeR, colorFor(b,S,di));
+            const d=node(lab,x,y,nodeR, useSubColors ? subFamilyColor(S) : colorFor(b,S,di)); // CHG
             gChart.appendChild(d);
             (DB.nodeIndex.get(lab) || DB.nodeIndex.set(lab,[]), DB.nodeIndex.get(lab)).push({x,y});
           }
@@ -532,7 +691,7 @@ function render(){
         for(let fi=0; fi<7; fi++){
           const a=a0 + (si*step);
           const [sx,sy]=polar(ring0, a);
-          gModes.appendChild(node(disp, sx,sy,4.8, "#a78bfa"));
+          gModes.appendChild(node(disp, sx,sy,4.8, useSubColors ? subFamilyColor(S) : "#a78bfa")); // CHG
           const fam=famOrder[fi];
           const [fx,fy]=polar(ring0+28, a);
           gModes.appendChild(node(fam, fx,fy,6.2, baseCols[fi%7]));
@@ -540,7 +699,7 @@ function render(){
           for(let di=0; di<Math.min(7,degs.length); di++){
             const [x,y]=polar(ring0+28+26+di*gap, a);
             const lab=normLabel(degs[di]);
-            const d=node(lab,x,y,nodeR, colorFor(b,S,di));
+            const d=node(lab,x,y,nodeR, useSubColors ? subFamilyColor(S) : colorFor(b,S,di)); // CHG
             gChart.appendChild(d);
             (DB.nodeIndex.get(lab) || DB.nodeIndex.set(lab,[]), DB.nodeIndex.get(lab)).push({x,y});
           }
@@ -569,7 +728,7 @@ function render(){
           // one sub label per sub (centered in its 7-slice block)
           const aSub = (a-90) + (blockStart+3.5)*st;
           const [sx,sy]=[ cx + Math.cos(aSub*Math.PI/180)*56, cy + Math.sin(aSub*Math.PI/180)*56 ];
-          gModes.appendChild(node(disp, sx,sy,4.2, "#a78bfa"));
+          gModes.appendChild(node(disp, sx,sy,4.2, useSubColors ? subFamilyColor(S) : "#a78bfa")); // CHG
 
           const rows = (((DB.data[k]||{})[B]||{})[S]||[]);
           const famOrder=familiesFor(k,B);
@@ -584,7 +743,7 @@ function render(){
               const rr = 84 + 22 + di*(gap*0.75);
               const [x,y]=[ cx + Math.cos(aa*Math.PI/180)*rr, cy + Math.sin(aa*Math.PI/180)*rr ];
               const lab=normLabel(degs[di]);
-              const d=node(lab,x,y,nodeR, colorFor(B,S,di));
+              const d=node(lab,x,y,nodeR, useSubColors ? subFamilyColor(S) : colorFor(B,S,di)); // CHG
               gChart.appendChild(d);
               (DB.nodeIndex.get(lab) || DB.nodeIndex.set(lab,[]), DB.nodeIndex.get(lab)).push({x,y});
             }
@@ -606,19 +765,72 @@ function render(){
           for(let di=0; di<Math.min(7,row.degrees.length); di++){
             const [x,y]=polar(130 + r*10 + di*gap, a);
             const lab=normLabel(row.degrees[di]);
-            const d=node(lab,x,y,nodeR, colorFor(G.B,G.S,di));
+            const d=node(lab,x,y,nodeR, useSubColors ? subFamilyColor(G.S) : colorFor(G.B,G.S,di)); // CHG
             gChart.appendChild(d);
             (DB.nodeIndex.get(lab) || DB.nodeIndex.set(lab,[]), DB.nodeIndex.get(lab)).push({x,y});
           }
         }
       });
     }
+  } else if (k==="All Keys" && b==="All Base Modes" && s==="All Sub Modes" && mini) {
+    // === NEW: All ROOTS mini webs (3-tier clusters per key) ===
+    const keys = sortKeysChromatic(DB.keys, 'C'); // C, Db, D, Eb... clockwise
+    const step = 360/Math.max(1, keys.length);
+    const ringCluster = 220 + parseInt(val('miniSpace')) * 1.3; // how far clusters are from center
+
+    keys.forEach((K,ki)=>{
+      const a = a0 + ki*step;
+      const [cx,cy] = polar(ringCluster, a);
+
+      // Center of the mini web: the KEY (root)
+      gModes.appendChild(node(K, cx, cy, 8, "#fff"));
+
+      // Ring 1: bases around the key (Ionian..Locrian)
+      const bases = Object.keys(DB.data[K]||{}).sort(sortModesCW);
+      const stepBase = 360/Math.max(1, bases.length);
+      const r1 = 62;           // radius for bases
+      const r2 = r1 + 26;      // radius for families (ring 2)
+
+      bases.forEach((B,bi)=>{
+        const aa = (a-90) + bi*stepBase;
+
+        // Base node (compact)
+        const [bx,by] = [ cx + Math.cos(aa*Math.PI/180)*r1, cy + Math.sin(aa*Math.PI/180)*r1 ];
+        gModes.appendChild(node(B.replace(/^[A-G](?:#|b)?\s+/,""), bx, by, 5.8, baseCols[bi%7]));
+
+        // Ring 2: 7 mode families for this base, distributed between the base angles
+        const famOrder = familiesFor(K, B);
+        for(let fi=0; fi<7; fi++){
+          const aa2 = aa + (fi*(stepBase/7)); // sub-step inside the base sector
+          const [fx,fy] = [ cx + Math.cos(aa2*Math.PI/180)*r2, cy + Math.sin(aa2*Math.PI/180)*r2 ];
+          gModes.appendChild(node(famOrder[fi], fx, fy, 4.4, baseCols[fi%7]));
+
+          // Ring 3: a few chord degrees for that family (kept small for readability)
+          const {degrees, sub} = degreesForFamilyAnySub(K, B, famOrder[fi]);
+          const take = Math.min(3, degrees.length);            // show up to 3 to keep it tidy
+          const gap = parseInt(val('rowGap'));                 // reuse your existing slider
+          const nodeR = parseInt(val('nodeR'));
+
+          for(let di=0; di<take; di++){
+            const rr = r2 + 18 + di*(gap*0.65);
+            const xx = cx + Math.cos(aa2*Math.PI/180)*rr;
+            const yy = cy + Math.sin(aa2*Math.PI/180)*rr;
+            const lab = normLabel(degrees[di]);
+            const d = node(lab, xx, yy, nodeR, sub ? subFamilyColor(sub) : colorFor(B, sub, di));
+            gChart.appendChild(d);
+            (DB.nodeIndex.get(lab) || DB.nodeIndex.set(lab,[]), DB.nodeIndex.get(lab)).push({x:xx,y:yy});
+          }
+        }
+      });
+    });
+
   } else {
-    // Mixed/fallback (All Keys or other combos)
+    // Mixed/fallback (All Keys or other combos) — keep your original scatter
+    const keysOrdered = (k==="All Keys") ? sortKeysChromatic(DB.keys, 'C') : [k];
     const groups=[];
-    for(const K of (k==="All Keys"? DB.keys : [k])){
-      for(const [B,subs] of Object.entries(DB.data[K]||{})){
-        for(const [S,rows] of Object.entries(subs)) groups.push({K,B,S,rows});
+    for (const K of keysOrdered){
+      for (const [B,subs] of Object.entries(DB.data[K]||{})){
+        for (const [S,rows] of Object.entries(subs)) groups.push({K,B,S,rows});
       }
     }
     const step=360/Math.max(1,groups.length);
@@ -629,13 +841,14 @@ function render(){
         for(let di=0; di<Math.min(7,row.degrees.length); di++){
           const [x,y]=polar(130 + r*10 + di*gap, a);
           const lab=normLabel(row.degrees[di]);
-          const d=node(lab,x,y,parseInt(val('nodeR')), colorFor(G.B,G.S,di));
+          const d=node(lab,x,y,parseInt(val('nodeR')), useSubColors ? subFamilyColor(G.S) : colorFor(G.B,G.S,di));
           gChart.appendChild(d);
           (DB.nodeIndex.get(lab) || DB.nodeIndex.set(lab,[]), DB.nodeIndex.get(lab)).push({x,y});
         }
       }
     });
   }
+
 
   el('vizMeta').textContent = `${k} • ${b} • ${s}`;
   showSelectionOverlay(); drawSelectionPath();
