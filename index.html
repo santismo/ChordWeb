@@ -1,781 +1,731 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ChordWeb 🎹 🕸️</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>ChordWeb — Constellations (stable endpoints • mini spacing • sub-mode minis)</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<style>
-  :root{
-    --bg:#0f172a; --fg:#e5e7eb; --card:#111827; --border:#374151;
-    --accent:#2563eb; --muted:#94a3b8;
-  }
-  :root[data-theme="light"]{
-  --bg:#f8fafc;
-  --fg:#0f172a;
-  --card:#f9fafb;
-  --border:#e5e7eb;
-}
-  html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
-  .wrap{max-width:980px;margin:0 auto;padding:12px}
+<style>	
+  :root{ --bg:#0f172a; --fg:#e5e7eb; --card:#111827; --border:#374151; --accent:#2563eb; --muted:#94a3b8; }
+  :root[data-theme="light"]{ --bg:#f8fafc; --fg:#0f172a; --card:#ffffff; --border:#e5e7eb; --accent:#2563eb; }
+  html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; overscroll-behavior-y: contain;}
+  .wrap{max-width:1200px;margin:0 auto;padding:12px}
   header{display:flex;align-items:center;gap:10px}
-  h1{font-size:18px;margin:0 6px 0 0}
-  button, select, input[type="number"], input[type="range"], input[type="text"]{
-    border-radius:14px;border:1px solid var(--border);background:var(--card);color:var(--fg);
-    padding:10px 12px;font-size:15px;
-  }
-  .accent{background:var(--accent); color:#fff;border-color:transparent}
-  .toolbar{display:grid;grid-template-columns:1fr 1fr; gap:8px; margin-top:10px}
-  .row{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
-  .row label{min-width:64px; color:var(--muted); font-size:14px}
-  .pill{padding:6px 10px; border-radius:999px; background:var(--card); border:1px solid var(--border)}
-  .cards{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:12px 0 24px}
-  @media (max-width:720px){ .cards{grid-template-columns:1fr} }
-  .card{ background:var(--card); border:1px solid var(--border); border-radius:16px; padding:10px; display:flex; gap:12px; align-items:center; }
-  .card h3{margin:0 0 6px 0; font-size:16px}
-  .card .img{flex:1}
-  .card .ctrls{display:flex; flex-direction:column; gap:8px; width:120px}
-  .small{font-size:12px; color:var(--muted)}
-  .spacer{flex:1}
-  .iconbtn{width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;border-radius:999px}
-  .tight{padding:6px 10px}
-  .notice{color:#ef4444;margin:8px 0}
-  details{border:1px solid var(--border); border-radius:12px; padding:8px; background:var(--card); margin-top:8px}
-  summary{cursor:pointer}
-  .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:12px; color:var(--muted)}
+  h1{font-size:18px;margin:0 8px 0 0}
+  button,select,input[type="number"],input[type="range"],input[type="text"],a.iconbtn{
+    border-radius:14px;border:1px solid var(--border);background:var(--card);color:var(--fg);padding:8px 10px;font-size:14px;text-decoration:none}
+  .pill{border-radius:999px}
+  .accent{background:var(--accent); color:#fff; border-color:transparent}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .row label{min-width:60px;color:var(--muted);font-size:13px}
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:10px;margin-top:10px}
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0 24px}
+  @media (max-width:900px){ .cards{grid-template-columns:1fr} }
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:10px;display:flex;gap:12px}
+  .iconbtn{width:40px;height:40px;display:inline-flex;align-items:center;justify-content:center;border-radius:999px}
+  .small{font-size:12px;color:var(--muted)}
+  .notice{color:#fca5a5}
+
+  /* Viz */
+  .vizhead{display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap}
+  .viztools{display:flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap}
+  svg#sun{width:100%;height:860px;cursor:grab;background:radial-gradient(ellipse at 50% 50%, rgba(255,255,255,.04), transparent 55%)}
+  svg#sun:active{cursor:grabbing}
+  .tooltip{position:fixed;pointer-events:none;background:#111;border:1px solid #333;color:#fff;padding:6px 8px;border-radius:8px;font-size:12px;opacity:0;transition:opacity .08s}
 </style>
 </head>
 <body>
-<div class="wrap" id="app">
+<div class="wrap">
   <header>
-    <h1>ChordWeb </h1>
+    <h1>ChordWeb</h1>
     <button id="themeBtn" class="iconbtn" title="Toggle theme">🌙</button>
-    <div class="spacer"></div>
-    <span title="SpiderWeb" style="font-size:22px">🕸️</span>
+    <div style="flex:1"></div>
+    <a class="iconbtn" href="https://github.com/santismo/ChordWeb" target="_blank" rel="noopener" title="GitHub">🕸️</a>
+    <button id="openSettings" class="pill">⚙️ Settings</button>
+    <button id="resetAll" class="pill">⟲ Reset</button>
   </header>
 
-  <div class="toolbar">
+  <!-- Controls -->
+  <div class="panel">
     <div class="row">
-      <label>Load</label>
-      <input type="file" id="file" accept=".csv,.xlsx,.xls" />
-      <button id="demo" class="tight">Load demo</button>
-      <button id="showStats" class="tight">Stats</button>
+      <label>Count</label><input id="count" type="number" min="1" max="16" value="4"/>
+      <label>Vol</label><input id="vol" type="range" min="0" max="100" value="45"/>
+      <label>Musicality</label><span class="small">Friendly</span>
+      <input id="spicy" type="range" min="0" max="100" value="0" title="Friendly ←————→ Spicy"/>
+      <span class="small">Spicy</span>
+      <label title="Avoid duplicate names in one batch"><input id="noRepeat" type="checkbox" checked/> No repeat</label>
+      <label title="For huge scenarios, draw compact mini clusters"><input id="mini" type="checkbox" checked/> Mini Webs</label>
     </div>
     <div class="row">
-      <label>Auto</label>
-      <input id="urlBox" type="text" placeholder="https://.../data.xlsx (or ?xlsx=...)" style="min-width:320px; flex:1"/>
-      <button id="loadUrl" class="tight">Load URL</button>
+      <label>Root</label><select id="rootSel"><option>All Keys</option></select><button id="rootRnd" class="iconbtn">🎲</button>
+      <label>Base</label><select id="baseSel"><option>All Base Modes</option></select><button id="baseRnd" class="iconbtn">🎲</button>
+      <label>Sub</label><select id="subSel"><option>All Sub Modes</option></select><button id="subRnd" class="iconbtn">🎲</button>
+      <label>Start</label><select id="startSel"><option>(none)</option></select>
     </div>
-    <div class="row">
-      <label>Count</label>
-      <input id="count" type="number" min="1" max="16" value="4"/>
-      <label style="margin-left:6px">Vol</label>
-      <input id="vol" type="range" min="0" max="100" value="45"/>
-    </div>
-
-    <div class="row">
-      <label>Root</label>
-      <select id="rootSel"><option>All Keys</option></select>
-      <button id="rootRnd" class="iconbtn">🎲</button>
-    </div>
-    <div class="row">
-      <label>Base</label>
-      <select id="baseSel"><option>All Base Modes</option></select>
-      <button id="baseRnd" class="iconbtn">🎲</button>
-    </div>
-
-    <div class="row">
-      <label>Sub</label>
-      <select id="subSel"><option>All Sub Modes</option></select>
-      <button id="subRnd" class="iconbtn">🎲</button>
-    </div>
-
-    <div class="row">
-      <label>Start</label>
-      <select id="startSel"><option>(none)</option></select>
-      <button id="startRnd" class="iconbtn">🎲</button>
-      <span class="small">(optional)</span>
-    </div>
-
-    <div class="row" style="grid-column:1/-1">
-      <label>Rows</label>
-      <input id="rowsEnable" type="checkbox"/>
-      <span class="small">Diatonic 1 ↔ 10 Chromatic</span>
-      <input id="rows" type="range" min="1" max="10" step="1" value="1" style="flex:1"/>
+    <div class="row" style="gap:12px">
+      <button id="gen" class="pill accent">🌀 Generate</button>
+      <button id="copy" class="pill">📋 Copy</button>
+      <div id="notice" class="notice small"></div>
     </div>
   </div>
 
-  <div class="row" style="margin-top:10px">
-    <button id="randAll" class="pill">🎲 Random All</button>
-    <button id="gen" class="pill accent">🌀 Generate</button>
-    <button id="copy" class="pill">📋 Copy names</button>
-  </div>
-
-  <div id="notice" class="notice"></div>
   <div id="cards" class="cards"></div>
 
-  <details id="statsBox" style="display:none">
-    <summary>Parsed dataset stats</summary>
-    <div class="mono" id="stats"></div>
-  </details>
+  <!-- Visual -->
+  <div class="panel">
+    <div class="vizhead">
+      <strong>Web Visual</strong>
+      <div id="vizMeta" class="small" style="margin-left:8px"></div>
+      <div class="viztools">
+        <label>Dot r</label><input id="nodeR" type="range" min="3" max="12" step="1" value="6">
+        <label>Gap</label><input id="rowGap" type="range" min="24" max="260" step="1" value="64">
+        <label>Mini space</label><input id="miniSpace" type="range" min="0" max="300" step="1" value="80" title="Distance between mini clusters">
+        <label>Mini group by</label>
+        <select id="miniGroup" title="How to group mini constellations when All Sub Modes is selected">
+          <option value="base" selected>Base</option>
+          <option value="sub">Sub (All)</option>
+        </select>
+        <button id="zoomIn"  class="iconbtn" title="Zoom in">＋</button>
+        <button id="zoomOut" class="iconbtn" title="Zoom out">－</button>
+        <button id="zoomReset" class="iconbtn" title="Reset view">⤾</button>
+        <button id="redraw" class="pill">Rebuild</button>
+      </div>
+    </div>
+    <svg id="sun" viewBox="0 0 1200 860" preserveAspectRatio="xMidYMid meet" aria-label="Constellation">
+      <g id="zoomG" transform="translate(0,0) scale(1)">
+        <g id="modesG"></g>
+        <g id="chartG"></g>
+        <g id="selG"></g>
+        <g id="pathG"></g>
+        <g id="pulseG"></g>
+      </g>
+    </svg>
+    <div class="small"> Hotkeys: **G** (generate), **R** (reset), **1–8** (play).</div>
+  </div>
+</div>
+<div id="tip" class="tooltip"></div>
+
+<!-- Settings -->
+<div id="settings" role="dialog" aria-modal="true" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.45);z-index:10000">
+  <div style="width:min(880px,92vw);background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px">
+    <div style="display:flex;align-items:center;gap:8px">
+      <h2 style="margin:0 0 6px 0;font-size:16px">Settings</h2>
+      <div style="flex:1"></div>
+      <button id="closeSettings" class="iconbtn">✖</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="panel">
+        <div class="row"><label>Load .xlsx</label><input type="file" id="file" accept=".xlsx,.xls"/></div>
+        <div class="row"><label>Data URL</label><input id="dataURL" type="text" placeholder="https://.../data.xlsx" style="min-width:320px;flex:1"/><button id="dataURLLoad">Load</button></div>
+        <div class="row small">Tip: <code>?xlsx=https://…/file.xlsx</code> autoloads. If CORS blocks it, use file upload.</div>
+      </div>
+      <div class="panel">
+        <div class="row"><strong>Parse stats</strong></div>
+        <div id="parseStats" class="small" style="font-family:ui-monospace,Menlo,Consolas,monospace"></div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
-// ------------ Utilities & theory ------------
-const noteToSemi = {"C":0,"B#":0,"C#":1,"Db":1,"D":2,"D#":3,"Eb":3,"E":4,"Fb":4,"F":5,"E#":5,"F#":6,"Gb":6,"G":7,"G#":8,"Ab":8,"A":9,"A#":10,"Bb":10,"B":11,"Cb":11,
-"Ebb":2,"Abb":6,"Bbb":9,"Fbb":3,"Cbb":10,"Gbb":5,"Dbb":0};
-const enh = {"Ebb":"D","Bbb":"A","Abb":"G","Dbb":"C","Gbb":"F","Cbb":"Bb","Fbb":"Eb","B#":"C","E#":"F","Cb":"B","Fb":"E"};
-const CANON = {0:'C',1:'C#',2:'D',3:'Eb',4:'E',5:'F',6:'F#',7:'G',8:'Ab',9:'A',10:'Bb',11:'B'};
-const romanRe = /^[b♭]?(?:I|II|III|IV|V|VI|VII)°?$/i;
-function fallbackQuality(n){
-  n = (n||"").toLowerCase().replace("♭","b").replace("°","");
-  return ({'v':'dom7','ii':'min7','iii':'min7','vi':'min7'})[n] || 'maj7';
-}
-function parseLabel(label){
-  const parts = (label||"").trim().split(/\s+/);
+/* ===== Helpers ===== */
+const normLabel = s => (s||"").replace(/\s+/g,' ').trim();
+
+/* ===== Music helpers ===== */
+const noteToSemi={"C":0,"B#":0,"C#":1,"Db":1,"D":2,"D#":3,"Eb":3,"E":4,"Fb":4,"F":5,"E#":5,"F#":6,"Gb":6,"G":7,"G#":8,"Ab":8,"A":9,"A#":10,"Bb":10,"B":11,"Cb":11};
+const CANON={0:'C',1:'C#',2:'D',3:'Eb',4:'E',5:'F',6:'F#',7:'G',8:'Ab',9:'A',10:'Bb',11:'B'};
+const MODE_ORDER=["Ionian","Dorian","Phrygian","Lydian","Mixolydian","Aeolian","Locrian"];
+const MODE_STEPS={
+  ionian:[0,2,4,5,7,9,11],
+  dorian:[0,2,3,5,7,9,10],
+  phrygian:[0,1,3,5,7,8,10],
+  lydian:[0,2,4,6,7,9,11],
+  mixolydian:[0,2,4,5,7,9,10],
+  aeolian:[0,2,3,5,7,8,10],
+  locrian:[0,1,3,5,6,8,10],
+};
+const rand=n=>Math.floor(Math.random()*n);
+const romanRe=/^[b♭]?(?:I|II|III|IV|V|VI|VII)°?$/i;
+/* parsing */
+function parseLabel(s){
+  const parts=(s||"").trim().split(/\s+/);
   if(!parts.length) return null;
-  let numeral = ""; let rootTokens = parts;
-  if(romanRe.test(parts[parts.length-1])){
-    numeral = parts.at(-1); rootTokens = parts.slice(0,-1);
-  }
-  let root = rootTokens.join("").replace(/\s+/g,"");
+  let numeral=""; let rootTokens=parts;
+  if(romanRe.test(parts.at(-1)||"")){ numeral=parts.at(-1); rootTokens=parts.slice(0,-1); }
+  let root=rootTokens.join("");
   if(root.endsWith("°")) return [root.slice(0,-1),'dim7'];
   if(root.endsWith("m")) return [root.slice(0,-1),'min7'];
   if((numeral||"").toLowerCase()==='v') return [root,'dom7'];
-  return [root, fallbackQuality(numeral)];
+  const q={"i":"maj7","ii":"min7","iii":"min7","iv":"maj7","v":"dom7","vi":"min7","vii":"dim7"}[(numeral||"").toLowerCase()]||"maj7";
+  return [root,q];
 }
-function canonicalNoteName(root){
-  let rf = (root||"").replace("♯","#").replace("♭","b");
-  if(enh[rf]) rf = enh[rf];
-  let s = noteToSemi[rf];
-  if(s==null) return root||"?";
-  return CANON[(s%12+12)%12] || root;
+function build7th(root,quality){
+  const R=noteToSemi[root.replace("♯","#").replace("♭","b")] ?? 0;
+  const iv={'maj7':[0,4,7,11],'min7':[0,3,7,10],'dom7':[0,4,7,10],'dim7':[0,3,6,9]}[quality]||[0,4,7,11];
+  return [iv.map(i=>R+i), R];
 }
-function canonicalize(label){
-  const p = parseLabel(label);
-  if(!p) return label;
-  const [r,q] = p;
-  return canonicalNoteName(r)+" "+q;
-}
-function build7th(root, quality){
-  let rf = (root||"").replace("♯","#").replace("♭","b");
-  if(!(rf in noteToSemi) && (rf in enh)) rf = enh[rf];
-  const r = noteToSemi[rf]; if(r==null) return [[],null];
-  const iv = {'maj7':[0,4,7,11],'min7':[0,3,7,10],'dom7':[0,4,7,10],'dim7':[0,3,6,9]}[quality] || [0,4,7,11];
-  return [iv.map(i=>r+i), r];
-}
-function isValidChordLabel(s){
-  const p = parseLabel(s);
-  if(!p) return false;
-  const [root, q] = p;
-  const [notes] = build7th(root, q);
-  return notes && notes.length>=3;
-}
+function chordPCSet(label){ const p=parseLabel(label); if(!p) return new Set(); const [r,q]=p; const [ns]=build7th(r,q); return new Set(ns.map(n=>((n%12)+12)%12)); }
+function jaccard(A,B){ let i=0; for(const x of A){ if(B.has(x)) i++; } const u=A.size+B.size-i; return u? i/u : 0; }
 
-// ------------ CSV parser ------------
-function parseCSV(text){
-  const rows=[]; let row=[]; let cur=""; let q=false;
-  for(let i=0;i<text.length;i++){
-    const ch = text[i];
-    if(ch === '"'){ if(q && text[i+1]==='"'){ cur+='"'; i++; } else { q=!q; } }
-    else if(ch === ',' && !q){ row.push(cur); cur=""; }
-    else if((ch === '\n' || ch === '\r') && !q){
-      if(cur.length || row.length){ row.push(cur); rows.push(row); row=[]; cur=""; }
-    } else { cur+=ch; }
-  }
-  if(cur.length || row.length){ row.push(cur); rows.push(row); }
-  return rows;
+/* ===== Data model =====
+   DB.data[key][base][sub] = [{family: <col D>, degrees: [E..K]}...] */
+const DB={keys:[],data:{},stats:{sheets:0,rows:0,rowsUsed:0,chordCells:0},nodeIndex:new Map()};
+function modeRank(s){ s=(s||"").toLowerCase(); for(let i=0;i<MODE_ORDER.length;i++){ if(s.includes(MODE_ORDER[i].toLowerCase())) return i; } return 999; }
+function sortModesCW(a,b){ const ra=modeRank(a), rb=modeRank(b); if(ra!==rb) return ra-rb; return (a||"").localeCompare(b||""); }
+function displaySubLabel(S){
+  let parts=(S||"").trim().split(/\s+/);
+  if(parts.length && /^[A-G](?:#|b)?$/i.test(parts[0])) parts=parts.slice(1); // strip leading root
+  return parts.join(' ');
 }
-
-// ------------ Data store ------------
-const DB = { keys:[], data:{}, chordIndex:new Map(), allChords:[], stats:{sheets:0, rows:0, rowsUsed:0, chords:0} };
-
-function indexData(data){
-  const chordIndex = new Map(); const allChords = new Set(); const keysSet = new Set(Object.keys(data));
-  let chordsCount = 0, rowsUsed = 0;
-  for(const [k,bases] of Object.entries(data)){
-    for(const [b,subs] of Object.entries(bases)){
-      for(const [s,rows] of Object.entries(subs)){
-        for(const row of rows){
-          const filtered = row.filter(isValidChordLabel);
-          if(!filtered.length) continue;
-          rowsUsed++;
-          for(const c of filtered){
-            chordsCount++;
-            allChords.add(c);
-            if(!chordIndex.has(c)) chordIndex.set(c,new Set());
-            chordIndex.get(c).add(`${k}||${b}||${s}`);
-          }
-          row.length = 0; row.push(...filtered);
-        }
-      }
-    }
-  }
-  DB.keys = Array.from(keysSet).sort();
-  DB.data = data;
-  DB.chordIndex = chordIndex;
-  DB.allChords = Array.from(allChords).sort();
-  DB.stats.rowsUsed = rowsUsed;
-  DB.stats.chords = chordsCount;
+function sortSubsModal(a,b){
+  const da=displaySubLabel(a), db=displaySubLabel(b);
+  const ra=modeRank((da.split(/\s+/)[0]||"")), rb=modeRank((db.split(/\s+/)[0]||""));
+  if(ra!==rb) return ra-rb;
+  return da.localeCompare(db);
 }
-
-function ingestRows(rows){
-  if(!rows.length) return;
-  const headers = rows[0].map(h=>h.trim());
-  const idxRoot = headers.findIndex(h=>/^root$/i.test(h)) !== -1 ? headers.findIndex(h=>/^root$/i.test(h)) : 0;
-  const idxBase = headers.findIndex(h=>/^base ?mode$/i.test(h));
-  const idxSub  = headers.findIndex(h=>/^sub ?mode$/i.test(h));
-  const chordCols = headers.map((h,i)=>i).filter(i=>i>=0 && i!==idxRoot && i!==idxBase && i!==idxSub);
-  const data = {};
-  for(let r=1;r<rows.length;r++){
-    const row = rows[r];
-    const key = (row[idxRoot]||"").trim() || "Unknown";
-    const base = (row[idxBase]||"").trim();
-    const sub  = (row[idxSub]||"").trim();
-    const chords = chordCols.map(i=>row[i]).filter(Boolean).map(s=>s.trim()).filter(isValidChordLabel);
-    if(!base || !sub || !chords.length) continue;
-    data[key] ??= {};
-    data[key][base] ??= {};
-    data[key][base][sub] ??= [];
-    data[key][base][sub].push(chords);
-  }
-  DB.stats.sheets = 1;
-  DB.stats.rows = rows.length-1;
-  indexData(data);
+function uniqueSubsForBase(k,b){
+  const src = Object.keys((DB.data[k]||{})[b]||{}).sort(sortSubsModal);
+  const seen=new Set(), out=[];
+  for(const s of src){ const disp=displaySubLabel(s); if(!seen.has(disp)){ seen.add(disp); out.push({value:s, disp}); } }
+  return out;
 }
-
-function ingestXLSX(workbook){
-  const data = {};
-  const sheetNames = workbook.SheetNames || [];
-  let totalRows = 0;
-  for(const sname of sheetNames){
-    const ws = workbook.Sheets[sname];
-    if(!ws) continue;
-    const rows = XLSX.utils.sheet_to_json(ws, { header:1, raw:true, blankrows:false });
-    if(!rows || rows.length < 2) continue;
-    totalRows += (rows.length-1);
-    const key = (sname||"").trim() || "Unknown";
-    let lastBase = "", lastSub = "";
+function ingestXLSX(wb){
+  const data={}; const names=wb.SheetNames||[]; let total=0, used=0, chords=0;
+  for(const s of names){
+    const ws=wb.Sheets[s]; if(!ws) continue;
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,blankrows:false});
+    if(!rows||rows.length<2) continue;
+    total += (rows.length-1);
+    const key=(s||"").trim();
+    let lastBase="", lastSub="";
     for(let r=1;r<rows.length;r++){
-      const row = rows[r] || [];
-      const baseCell = (row[1]!=null ? (""+row[1]) : "").trim();
-      const subCell  = (row[2]!=null ? (""+row[2]) : "").trim();
-      if(baseCell) lastBase = baseCell;
-      if(subCell)  lastSub  = subCell;
-      const base = lastBase;
-      const sub  = lastSub;
-      const chords = [];
-      for(let c=3;c<100;c++){
-        const val = row[c];
-        if(val==null) continue;
-        const s = (""+val).trim();
-        if(!s) continue;
-        if(isValidChordLabel(s)) chords.push(s);
-      }
-      if(!base || !sub || !chords.length) continue;
-      data[key] ??= {};
-      data[key][base] ??= {};
-      data[key][base][sub] ??= [];
-      data[key][base][sub].push(chords);
+      const row=rows[r]||[];
+      const baseCell=(row[1]!=null?(""+row[1]).trim():""); if(baseCell) lastBase=baseCell;
+      const subCell =(row[2]!=null?(""+row[2]).trim():""); if(subCell) lastSub=subCell;
+      const famCell =(row[3]!=null?(""+row[3]).trim():"");
+      const base=lastBase, sub=lastSub; if(!base||!sub) continue;
+      const degrees=[];
+      for(let c=4;c<600;c++){ const v=row[c]; if(v==null) continue; const s=(""+v).trim(); if(s) degrees.push(s); }
+      if(!degrees.length) continue;
+      used++; chords += degrees.length;
+      (data[key] ||= {})[base] ||= {};
+      (data[key][base][sub] ||= []).push({family:famCell, degrees});
     }
   }
-  DB.stats.sheets = sheetNames.length;
-  DB.stats.rows = totalRows;
-  indexData(data);
+  DB.keys=Object.keys(data).sort();
+  DB.data=data; DB.stats={sheets:names.length,rows:total,rowsUsed:used,chordCells:chords};
 }
 
-// ------------ Buckets/Pool ------------
-function bucketsFor(selKey, selBase, selSub){
-  const keys = selKey==="All Keys" ? DB.keys : [selKey];
-  const out=[];
-  for(const k of keys){
-    const bdict = DB.data[k]||{};
-    const bases = selBase==="All Base Modes" ? Object.keys(bdict) : [selBase];
-    for(const b of bases){
-      const sdict = bdict[b]||{};
-      const subs = selSub==="All Sub Modes" ? Object.keys(sdict) : [selSub];
-      for(const s of subs){
-        const rows = sdict[s]||[];
-        for(const r of rows){
-          const rr = r.filter(isValidChordLabel);
-          if(rr.length) out.push(rr);
-        }
-      }
-    }
-  }
-  return out;
-}
-function poolFor(selKey, selBase, selSub){
-  const keys = selKey==="All Keys" ? DB.keys : [selKey];
-  const out=[];
-  for(const k of keys){
-    const bdict = DB.data[k]||{};
-    for(const [b,subs] of Object.entries(bdict)){
-      if(selBase!=="All Base Modes" && b!==selBase) continue;
-      for(const [s,rows] of Object.entries(subs)){
-        if(selSub!=="All Sub Modes" && s!==selSub) continue;
-        for(const r of rows){ for(const c of r){ if(isValidChordLabel(c)) out.push(c); } }
-      }
-    }
-  }
-  return out;
-}
-
-function refreshStartChoices(){
-  const keySel = document.getElementById('rootSel').value;
-  const allowedKeys = keySel==="All Keys" ? DB.keys : [keySel];
-  const allowed = new Set();
-  for(const [ch, combos] of DB.chordIndex.entries()){
-    for(const combo of combos){
-      const [k] = combo.split("||");
-      if(allowedKeys.includes(k)){ allowed.add(ch); break; }
-    }
-  }
-  const startSel = document.getElementById('startSel');
-  const vals = ["(none)", ...Array.from(allowed).sort()];
-  startSel.innerHTML = vals.map(v=>`<option>${v}</option>`).join("");
-}
-
+/* ===== UI: selectors ===== */
 function updateSelectors(){
-  const rootSel = document.getElementById('rootSel');
+  const rootSel=document.getElementById('rootSel');
   rootSel.innerHTML = `<option>All Keys</option>` + DB.keys.map(k=>`<option>${k}</option>`).join("");
-
-  document.getElementById('baseSel').innerHTML = `<option>All Base Modes</option>`;
-  document.getElementById('subSel').innerHTML  = `<option>All Sub Modes</option>`;
+  document.getElementById('baseSel').innerHTML=`<option>All Base Modes</option>`;
+  document.getElementById('subSel').innerHTML = `<option>All Sub Modes</option>`;
   refreshStartChoices();
 }
-
 function onRootChange(){
-  const key = document.getElementById('rootSel').value;
-  if(key==="All Keys"){
-    document.getElementById('baseSel').innerHTML = `<option>All Base Modes</option>`;
-    document.getElementById('subSel').innerHTML  = `<option>All Sub Modes</option>`;
-  } else {
-    const bases = Object.keys(DB.data[key]||{}).sort();
-    document.getElementById('baseSel').innerHTML = `<option>All Base Modes</option>` + bases.map(b=>`<option>${b}</option>`).join("");
-    document.getElementById('subSel').innerHTML  = `<option>All Sub Modes</option>`;
+  const k=val('rootSel');
+  const baseSel=document.getElementById('baseSel');
+  const subSel=document.getElementById('subSel');
+  if(k==="All Keys"){ baseSel.innerHTML=`<option>All Base Modes</option>`; subSel.innerHTML=`<option>All Sub Modes</option>`; }
+  else {
+    const bases=Object.keys(DB.data[k]||{}).sort(sortModesCW);
+    baseSel.innerHTML = `<option>All Base Modes</option>` + bases.map(b=>`<option>${b}</option>`).join("");
+    subSel.innerHTML = `<option>All Sub Modes</option>`;
   }
-  refreshStartChoices();
-  renderCards([]);
+  SEL_CHOICE.clear();
+  refreshStartChoices(); render();
 }
 function onBaseChange(){
-  const key = document.getElementById('rootSel').value;
-  const base= document.getElementById('baseSel').value;
-  if(key==="All Keys" || base==="All Base Modes"){
-    document.getElementById('subSel').innerHTML  = `<option>All Sub Modes</option>`;
-  } else {
-    const subs = Object.keys((DB.data[key]||{})[base]||{}).sort();
-    document.getElementById('subSel').innerHTML  = `<option>All Sub Modes</option>` + subs.map(s=>`<option>${s}</option>`).join("");
+  const k=val('rootSel'), b=val('baseSel');
+  const subSel=document.getElementById('subSel');
+  if(k==="All Keys" || b==="All Base Modes"){ subSel.innerHTML=`<option>All Sub Modes</option>`; }
+  else{
+    const subs=uniqueSubsForBase(k,b);
+    subSel.innerHTML = `<option>All Sub Modes</option>` + subs.map(s=>`<option value="${s.value}">${s.disp}</option>`).join("");
   }
-  refreshStartChoices();
-  renderCards([]);
+  SEL_CHOICE.clear();
+  refreshStartChoices(); render();
 }
-function onStartChange(){ refreshStartChoices(); }
-
-// ------------ Audio (WebAudio) with normalization & compressor ------------
-let audioCtx = null;
-function ensureAudio(){
-  if(!audioCtx){ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }
-  if(audioCtx.state === 'suspended'){ audioCtx.resume(); }
-  return audioCtx;
-}
-function playChord(notes, gain=0.45, seconds=0.9){
-  if(!notes || !notes.length) return;
-  const ctx = ensureAudio();
-  const now = ctx.currentTime + 0.01;
-  const userGain = Math.max(0, Math.min(1, gain));
-  const vol = Math.pow(userGain, 1.6); // nicer slider response
-
-  // compressor
-  const comp = ctx.createDynamicsCompressor();
-  comp.threshold.value = -24;
-  comp.knee.value = 30;
-  comp.ratio.value = 12;
-  comp.attack.value = 0.003;
-  comp.release.value = 0.25;
-
-  const master = ctx.createGain();
-  master.gain.value = vol;
-  comp.connect(master);
-  master.connect(ctx.destination);
-
-  const n = notes.length;
-  const baseMidi = 60;
-  const perVoice = 0.6 / Math.sqrt(n);
-
-  // ADSR
-  const a = 0.02, d = 0.03, s = 0.85, r = 0.20;
-  const endTime = now + seconds;
-
-  for(const x of notes){
-    const osc = ctx.createOscillator();
-    const g = ctx.createGain();
-    const hz = 440 * Math.pow(2, ((baseMidi + (x%12)) - 69)/12);
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(hz, now);
-
-    g.gain.setValueAtTime(0.0001, now);
-    g.gain.exponentialRampToValueAtTime(perVoice, now + a);
-    g.gain.exponentialRampToValueAtTime(perVoice * s, now + a + d);
-    g.gain.setValueAtTime(perVoice * s, endTime - r);
-    g.gain.exponentialRampToValueAtTime(0.0001, endTime);
-
-    osc.connect(g);
-    g.connect(comp);
-
-    osc.start(now);
-    osc.stop(endTime + 0.02);
+function refreshStartChoices(){
+  const key=val('rootSel');
+  const allowedKeys = key==="All Keys"? DB.keys : [key];
+  const set=new Set();
+  for(const K of allowedKeys){
+    const bases=DB.data[K]||{};
+    for(const [B,subs] of Object.entries(bases)){
+      for(const [S,rows] of Object.entries(subs)){
+        for(const row of rows) for(const ch of row.degrees) set.add(normLabel(ch));
+      }
+    }
   }
+  const startSel=document.getElementById('startSel');
+  startSel.innerHTML=['(none)',...Array.from(set).filter(Boolean).sort()].map(v=>`<option>${v}</option>`).join("");
 }
 
-// ------------ MIDI (very small SMF writer) ------------
-function writeVarLen(n){ const out=[]; let buffer = n & 0x7F; while((n >>=7)){ buffer <<=8; buffer |= ((n & 0x7F)|0x80); } while(true){ out.push(buffer&0xFF); if(buffer & 0x80){ buffer >>=8; } else break; } return out; }
-function chordToMIDI(notes){
-  const base = 60;
-  const on=[];
-  for(const x of notes){
-    const pitch = base + (x%12);
-    on.push(0x90, pitch, 90);
-  }
-  const track = [];
-  for(let i=0;i<on.length;i+=3){ track.push(0x00, on[i], on[i+1], on[i+2]); }
-  const delta = writeVarLen(480);
-  for(const x of notes){
-    const pitch = base + (x%12);
-    track.push(...delta, 0x80, pitch, 64);
-  }
-  track.push(0x00, 0xFF, 0x2F, 0x00);
-  const header = new Uint8Array([
-    0x4d,0x54,0x68,0x64, 0x00,0x00,0x00,0x06, 0x00,0x00, 0x00,0x01, 0x01,0xE0,
-  ]);
-  const len = track.length;
-  const lenBytes = new Uint8Array([(len>>>24)&255,(len>>>16)&255,(len>>>8)&255,len&255]);
-  const chunk = new Uint8Array([0x4d,0x54,0x72,0x6b, ...lenBytes, ...track]);
-  return new Blob([header, chunk], {type:"audio/midi"});
+/* ===== Families for a (root, base) in modal order ===== */
+function familiesFor(rootKey, base){
+  const baseName=(base||"Ionian").replace(/^[A-G](?:#|b)?\s+/,""); // "C Ionian" -> "Ionian"
+  const steps=MODE_STEPS[(baseName||"ionian").toLowerCase()]||MODE_STEPS.ionian;
+  const R=noteToSemi[rootKey]??0;
+  return steps.map(d=> `${CANON[(R+d+1200)%12]} ${baseName}`);
 }
 
-// ------------ Rows logic & generation ------------
-function sampleChords(){
-  const key = document.getElementById('rootSel').value;
-  const base= document.getElementById('baseSel').value;
-  const sub = document.getElementById('subSel').value;
-  const n   = Math.max(1, Math.min(16, parseInt(document.getElementById('count').value||"8")));
-  const rowsEnabled = document.getElementById('rowsEnable').checked;
-  const level = parseInt(document.getElementById('rows').value||"1");
-  const start = document.getElementById('startSel').value;
-  const startOpt = (!start || start== "(none)") ? null : start;
+/* ===== Sampling ===== */
+let CURRENT=[];
+function bucketsFor(k,b,s){
+  const keys=(k==="All Keys")? DB.keys : [k];
+  const out=[];
+  for(const K of keys){
+    for(const [B,subs] of Object.entries(DB.data[K]||{})){
+      if(b!=="All Base Modes" && B!==b) continue;
+      for(const [S,rows] of Object.entries(subs)){
+        if(s!=="All Sub Modes" && S!==s) continue;
+        for(const row of rows){
+          const degs=(row.degrees||[]).filter(Boolean);
+          if(degs.length){ out.push({key:K,base:B,sub:S,family:row.family,row:degs}); }
+        }
+      }
+    }
+  }
+  return out;
+}
+function sample(n){
+  const k=val('rootSel'), b=val('baseSel'), s=val('subSel');
+  const spicy=parseInt(val('spicy'))/100;
+  const start=val('startSel'); const startOpt=(start && start!=="(none)")? start:null;
 
-  const pool = poolFor(key, base, sub);
-  const buckets = bucketsFor(key, base, sub);
+  const groups=bucketsFor(k,b,s);
+  const pool=[]; 
+  for(const g of groups){
+    g.row.forEach((label,ci)=>{
+      const lab = normLabel(label);
+      pool.push({label:lab, key:g.key,base:g.base,sub:g.sub,family:g.family,ci});
+    });
+  }
   if(!pool.length) return [];
 
-  let seq = [];
-  if(rowsEnabled && buckets.length){
-    let homeIdx = null;
-    if(startOpt){
-      for(let i=0;i<buckets.length;i++){ if(buckets[i].includes(startOpt)){ homeIdx = i; break; } }
-    }
-    if(homeIdx==null){
-      homeIdx = buckets.reduce((best,i,idx)=> (buckets[idx].length > buckets[best].length ? idx : best), 0);
-    }
-    const home = buckets[homeIdx];
-    const outsidersAllowed = Math.max(0, level-1);
-    if(startOpt && pool.includes(startOpt)) seq.push(startOpt);
-    let outsidersUsed = 0;
-    while(seq.length < n){
-      let pick = null;
-      const homeAvail = home.filter(c=>!seq.includes(c));
-      if(homeAvail.length) pick = homeAvail[Math.floor(Math.random()*homeAvail.length)];
-      if((pick==null || Math.random() < (outsidersAllowed/12)) && outsidersUsed < outsidersAllowed){
-        const outside = buckets.flatMap((r,i)=> i===homeIdx?[]:r).filter(c=>!seq.includes(c));
-        if(outside.length){ pick = outside[Math.floor(Math.random()*outside.length)]; outsidersUsed++; }
-      }
-      if(pick==null){
-        const rest = pool.filter(c=>!seq.includes(c));
-        if(!rest.length) break;
-        pick = rest[Math.floor(Math.random()*rest.length)];
-      }
-      if(seq.at(-1)===pick) continue;
-      seq.push(pick);
-    }
-  } else {
-    if(startOpt && pool.includes(startOpt)){
-      const wo = pool.filter(c=>c!==startOpt);
-      const take = Math.max(0, Math.min(n-1, wo.length));
-      seq = [startOpt, ...shuffle(wo).slice(0, take)];
-    } else {
-      seq = shuffle(pool).slice(0, Math.min(n, pool.length));
-    }
+  for(let i=pool.length-1;i>0;i--){ const j=rand(i+1); [pool[i],pool[j]]=[pool[j],pool[i]]; }
+
+  const out=[]; const used=new Set();
+  function biasedPick(prev){
+    if(!prev || spicy<=0) return pool.pop();
+    const A=chordPCSet(prev.label);
+    const k=Math.min(12,pool.length);
+    const cand=pool.slice(-k).map((o,idx)=>({idx:pool.length-k+idx,o,sc:jaccard(A,chordPCSet(o.label))})).sort((x,y)=>y.sc-x.sc);
+    const top=Math.max(1, Math.round(1+spicy*5));
+    const choice=cand[rand(Math.min(top,cand.length))];
+    return pool.splice(choice.idx,1)[0];
   }
-  return seq;
-}
-function shuffle(a){ const arr=a.slice(); for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
 
-// ------------ Rendering ------------
-let CURRENT = [];
-function renderCards(chords){
-  CURRENT = chords.slice();
-  const cont = document.getElementById('cards');
-  cont.innerHTML = "";
-  const vol = Math.max(0, Math.min(1, (parseInt(document.getElementById('vol').value||"45")/100)));
-  chords.forEach((ch, i)=>{
-    const p = parseLabel(ch); if(!p) return;
-    const [root, qual] = p;
-    const [notes, rootSemi] = build7th(root, qual);
-
-    const card = document.createElement('div'); card.className="card";
-    const meta = document.createElement('div');
-    meta.style.flex="0 0 120px";
-    meta.innerHTML = `<h3>#${i+1}</h3><div>${escapeHTML(canonicalize(ch))}</div>`;
-    const img = document.createElement('div'); img.className="img";
-    img.appendChild(drawKeyboard(notes, rootSemi));
-    const ctrls = document.createElement('div'); ctrls.className="ctrls";
-    const playBtn = document.createElement('button'); playBtn.textContent="▶️ Play"; playBtn.onclick=()=>playChord(notes, vol);
-    const regenBtn = document.createElement('button'); regenBtn.textContent="🌀 Regen"; regenBtn.onclick=()=>{ CURRENT[i] = sampleReplacement(i); renderCards(CURRENT); };
-    const midiBtn = document.createElement('button'); midiBtn.textContent="🎹 MIDI"; midiBtn.onclick=()=>{
-      const blob = chordToMIDI(notes);
-      const a = document.createElement('a');
-      const safe = ch.replace(/[^A-Za-z0-9_\-]+/g,'_').replace(/^_+|_+$/g,'');
-      a.href = URL.createObjectURL(blob);
-      a.download = safe + ".mid";
-      a.click();
-      setTimeout(()=>URL.revokeObjectURL(a.href), 1500);
-    };
-    ctrls.append(playBtn, regenBtn, midiBtn);
-    card.append(meta, img, ctrls);
-    cont.appendChild(card);
-  });
-}
-function sampleReplacement(index){
-  const key = document.getElementById('rootSel').value;
-  const base= document.getElementById('baseSel').value;
-  const sub = document.getElementById('subSel').value;
-  const pool = poolFor(key, base, sub);
-  const existing = new Set(CURRENT);
-  const options = pool.filter(c=>!existing.has(c));
-  return (options.length? options[Math.floor(Math.random()*options.length)] : pool[Math.floor(Math.random()*pool.length)]);
-}
-
-// ---------- Drawing keyboard (fixed orientation) ----------
-function drawKeyboard(notes, rootSemi){
-  const onset = new Set(notes.map(n=>((n%12)+12)%12));
-  const svgNS = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(svgNS,"svg");
-  const W=420,H=110; svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
-
-  const whites=[]; let count=0; let midi=48;
-  while(count<22){ if(![1,3,6,8,10].includes(midi%12)){ whites.push(midi); count++; } midi++; }
-  const whiteW = W/22;
-
-  whites.forEach((m,idx)=>{
-    const on = onset.has(m%12);
-    const r = document.createElementNS(svgNS,"rect");
-    r.setAttribute("x", idx*whiteW); r.setAttribute("y",0);
-    r.setAttribute("width", whiteW); r.setAttribute("height", H);
-    r.setAttribute("fill", on ? "#86efac" : "#ffffff");
-    r.setAttribute("stroke", "#222");
-    svg.appendChild(r);
-  });
-
-  const blacks=[];
-  for(let n=48;n<48+36;n++){
-    const s=n%12;
-    if([1,3,6,8,10].includes(s)){ if(whites.some(w=> w<n && (w+2)>n)) blacks.push(n); }
+  if(startOpt){
+    const idx=pool.findIndex(o=>o.label===startOpt);
+    const pre=(idx>=0)? pool.splice(idx,1)[0] : {label:startOpt,key:k,base:b,sub:s,family:"",ci:0};
+    out.push(pre); used.add(pre.label);
   }
-  blacks.forEach((m)=>{
-    const wi = whites.findIndex(w=>w>m) - 1;
-    const x = wi*whiteW + whiteW*0.65;
-    const on = onset.has(m%12);
-    const r = document.createElementNS(svgNS,"rect");
-    r.setAttribute("x", x); r.setAttribute("y", 0);
-    r.setAttribute("width", whiteW*0.6); r.setAttribute("height", H*0.65);
-    r.setAttribute("fill", on ? "#86efac" : "#111");
-    r.setAttribute("stroke", "#222");
-    r.setAttribute("stroke-width", "1");
-    r.setAttribute("rx", "2"); r.setAttribute("ry", "2");
-    svg.appendChild(r);
-  });
+  while(out.length<n && pool.length){
+    const p=biasedPick(out[out.length-1]);
+    if(!el('noRepeat').checked || !used.has(p.label)){ out.push(p); used.add(p.label); }
+  }
+  return out;
+}
 
-  whites.forEach((m,idx)=>{
-    if(rootSemi!=null && (m%12)===((rootSemi%12)+12)%12){
-      const c = document.createElementNS(svgNS,"circle");
-      c.setAttribute("cx", idx*whiteW + whiteW/2);
-      c.setAttribute("cy", H-14);
-      c.setAttribute("r", 7);
-      c.setAttribute("fill", "#2563eb");
-      svg.appendChild(c);
-    }
-  });
-  blacks.forEach((m)=>{
-    if(rootSemi!=null && (m%12)===((rootSemi%12)+12)%12){
-      const wi = whites.findIndex(w=>w>m) - 1;
-      const x = wi*whiteW + whiteW*0.65;
-      const c = document.createElementNS(svgNS,"circle");
-      c.setAttribute("cx", x + whiteW*0.3);
-      c.setAttribute("cy", H*0.65 - 10);
-      c.setAttribute("r", 6);
-      c.setAttribute("fill", "#2563eb");
-      svg.appendChild(c);
-    }
-  });
-
+/* ===== Cards & audio ===== */
+let audioCtx=null; function ctx(){ if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)(); return audioCtx; }
+function playChord(notes,gain=0.45,seconds=0.9){
+  const ac=ctx(); const now=ac.currentTime+0.01;
+  const comp=ac.createDynamicsCompressor(); comp.threshold.value=-24; comp.knee.value=30; comp.ratio.value=12; comp.attack.value=0.003; comp.release.value=0.25;
+  const master=ac.createGain(); const vol=Math.pow(Math.max(0,Math.min(1,gain)),1.6); master.gain.value=vol; comp.connect(master); master.connect(ac.destination);
+  const base=60; const a=0.02,d=0.03,s=0.85,r=0.20; const end=now+seconds;
+  for(const x of notes){
+    const osc=ac.createOscillator(); const g=ac.createGain(); const hz=440*Math.pow(2,((base+(x%12))-69)/12);
+    osc.type='sine'; osc.frequency.setValueAtTime(hz, now);
+    g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(0.6/Math.sqrt(notes.length), now+a);
+    g.gain.exponentialRampToValueAtTime(0.6/Math.sqrt(notes.length)*s, now+a+d);
+    g.gain.setValueAtTime(0.6/Math.sqrt(notes.length)*s, end-r); g.gain.exponentialRampToValueAtTime(0.0001, end);
+    osc.connect(g); g.connect(comp); osc.start(now); osc.stop(end+0.02);
+  }
+}
+function drawKeys(notes, rootPC){
+  const onset=new Set((notes||[]).map(n=>((n%12)+12)%12));
+  const NS="http://www.w3.org/2000/svg", W=420,H=110, svg=document.createElementNS(NS,"svg");
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  const whites=[]; let count=0, midi=48; while(count<22){ if(![1,3,6,8,10].includes(midi%12)){ whites.push(midi); count++; } midi++; }
+  const ww=W/22;
+  whites.forEach((m,i)=>{ const r=document.createElementNS(NS,"rect"); r.setAttribute("x",i*ww); r.setAttribute("y",0);
+    r.setAttribute("width",ww); r.setAttribute("height",H); r.setAttribute("fill", onset.has(m%12)?"#86efac":"#ffffff"); r.setAttribute("stroke","#222"); svg.appendChild(r); });
+  const blacks=[]; for(let n=48;n<48+36;n++){ const s=n%12; if([1,3,6,8,10].includes(s)){ if(whites.some(w=> w<n && (w+2)>n)) blacks.push(n); } }
+  blacks.forEach(m=>{ const wi=whites.findIndex(w=>w>m)-1; const x=wi*ww+ww*0.65; const r=document.createElementNS(NS,"rect");
+    r.setAttribute("x",x); r.setAttribute("y",0); r.setAttribute("width",ww*0.6); r.setAttribute("height",H*0.65);
+    r.setAttribute("fill", onset.has(m%12)?"#86efac":"#111"); r.setAttribute("stroke","#222"); r.setAttribute("rx","2"); r.setAttribute("ry","2"); svg.appendChild(r); });
+  const rootWhiteIndex = whites.findIndex(m=> (m%12)===((rootPC%12+12)%12) );
+  if(rootWhiteIndex>=0){
+    const cx = rootWhiteIndex*ww + ww/2;
+    const cy = H - 8;
+    const dot=document.createElementNS(NS,"circle");
+    dot.setAttribute("cx",cx); dot.setAttribute("cy",cy); dot.setAttribute("r",5);
+    dot.setAttribute("fill","#60a5fa"); dot.setAttribute("stroke","#1e3a8a"); dot.setAttribute("stroke-width","1.5");
+    svg.appendChild(dot);
+  }
   return svg;
 }
-function escapeHTML(s){return (s||"").replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));}
-
-// ------------ Wire up UI ------------
-function setNotice(msg){ document.getElementById('notice').textContent = msg||""; }
-document.getElementById('themeBtn').onclick = () => {
-  const root = document.documentElement; // <html>
-  const isLight = root.getAttribute('data-theme') === 'light';
-  root.setAttribute('data-theme', isLight ? 'dark' : 'light');
-  // optional: flip the icon
-  document.getElementById('themeBtn').textContent = isLight ? '🌙' : '☀️';
-};
-['rootSel','baseSel','subSel'].forEach(id=> document.getElementById(id).onchange = (id==='rootSel'?onRootChange:(id==='baseSel'?onBaseChange:()=>{})));
-document.getElementById('startSel').onchange = onStartChange;
-document.getElementById('gen').onclick = ()=>{ const seq = sampleChords(); if(!seq.length) setNotice("No chords found for this selection."); else setNotice(""); renderCards(seq); };
-document.getElementById('randAll').onclick = ()=>{
-  const k = DB.keys[Math.floor(Math.random()*DB.keys.length)]; if(!k) return;
-  document.getElementById('rootSel').value = k; onRootChange();
-  const bases = Object.keys(DB.data[k]||{}); const b = bases[Math.floor(Math.random()*bases.length)];
-  document.getElementById('baseSel').value = b; onBaseChange();
-  const subs = Object.keys((DB.data[k]||{})[b]||{}); const s = subs[Math.floor(Math.random()*subs.length)];
-  document.getElementById('subSel').value = s;
-  refreshStartChoices();
-  const rows = (DB.data[k]||{})[b]?.[s] || [];
-  const all = rows.flat().filter(Boolean);
-  document.getElementById('startSel').value = all.length ? all[Math.floor(Math.random()*all.length)] : "(none)";
-};
-['rootRnd','baseRnd','subRnd','startRnd'].forEach(id=>{
-  document.getElementById(id).onclick = ()=>{
-    if(id==='rootRnd'){ const arr=DB.keys; if(arr.length){ document.getElementById('rootSel').value = arr[Math.floor(Math.random()*arr.length)]; onRootChange(); } }
-    if(id==='baseRnd'){ const k=document.getElementById('rootSel').value; const arr = (k==="All Keys")?[]:Object.keys(DB.data[k]||{}); if(arr.length){ document.getElementById('baseSel').value = arr[Math.floor(Math.random()*arr.length)]; onBaseChange(); } }
-    if(id==='subRnd'){ const k=document.getElementById('rootSel').value; const b=document.getElementById('baseSel').value; const arr=(k==="All Keys"||b==="All Base Modes")?[]:Object.keys((DB.data[k]||{})[b]||{}); if(arr.length){ document.getElementById('subSel').value = arr[Math.floor(Math.random()*arr.length)]; refreshStartChoices(); } }
-    if(id==='startRnd'){ const opt = document.getElementById('startSel'); if(opt.options.length>1){ opt.selectedIndex = 1 + Math.floor(Math.random()*(opt.options.length-1)); } }
-  };
-});
-document.getElementById('copy').onclick = async ()=>{
-  const txt = CURRENT.join(', ');
-  try{ await navigator.clipboard.writeText(txt); setNotice("Copied: "+txt); setTimeout(()=>setNotice(""), 2000); }
-  catch(e){ setNotice("Copy failed: "+e); }
-};
-
-document.getElementById('file').onchange = async (e)=>{
-  const f = e.target.files[0]; if(!f) return;
-  const name = (f.name||"").toLowerCase();
-  DB.keys=[]; DB.data={}; DB.chordIndex=new Map(); DB.allChords=[]; DB.stats={sheets:0, rows:0, rowsUsed:0, chords:0};
-  try{
-    if(name.endsWith(".xlsx") || name.endsWith(".xls")){
-      const ab = await f.arrayBuffer();
-      const wb = XLSX.read(ab, { type:'array' });
-      ingestXLSX(wb);
-      updateSelectors(); setNotice(DB.allChords.length ? "XLSX loaded ✔" : "Parsed XLSX but found no valid chords. Check Stats.");
-    } else if(name.endsWith(".csv")){
-      const text = await f.text();
-      const rows = parseCSV(text);
-      ingestRows(rows);
-      updateSelectors(); setNotice(DB.allChords.length ? "CSV loaded ✔" : "Parsed CSV but found no valid chords. Check Stats.");
-    } else {
-      setNotice("Unsupported file type. Use .xlsx or .csv");
-      return;
-    }
-    renderCards([]);
-    renderStats();
-  } catch(err){
-    console.error(err);
-    setNotice("Failed to parse file: "+err);
-  }
-};
-
-document.getElementById('showStats').onclick = ()=>{
-  const box = document.getElementById('statsBox');
-  box.style.display = 'block';
-  box.open = true;
-  renderStats();
-};
-function renderStats(){
-  const s = DB.stats || {};
-  const keys = DB.keys || [];
-  const lines = [];
-  lines.push(`Sheets: ${s.sheets||0}`);
-  lines.push(`Rows scanned: ${s.rows||0}`);
-  lines.push(`Rows used (with valid chords): ${s.rowsUsed||0}`);
-  lines.push(`Valid chords indexed: ${s.chords||0}`);
-  lines.push(`Keys detected: ${keys.length ? keys.join(', ') : '(none)'}`);
-  document.getElementById('stats').textContent = lines.join('\n');
-  const box = document.getElementById('statsBox'); box.style.display = 'block';
+function renderCards(seq){
+  CURRENT=seq.slice();
+  // When the chord list changes, reset endpoint choices so new ones can be picked.
+  SEL_CHOICE.clear();
+  const cont=el('cards'); cont.innerHTML="";
+  const vol=parseInt(val('vol'))/100;
+  seq.forEach((o,i)=>{
+    const [root,q]=parseLabel(o.label); const [notes,R]=build7th(root,q);
+    const card=document.createElement('div'); card.className="card";
+    const meta=document.createElement('div'); meta.style.flex="0 0 160px"; meta.innerHTML=`<h3>#${i+1}</h3><div>${o.label}</div><div class="small">${o.key} • ${o.base} • ${displaySubLabel(o.sub)}${o.family?(' • '+o.family):''}</div>`;
+    const img=document.createElement('div'); img.style.flex="1"; img.appendChild(drawKeys(notes, R%12));
+    const btns=document.createElement('div'); btns.style.display="flex"; btns.style.flexDirection="column"; btns.style.gap="8px"; btns.style.width="120px";
+    const play=document.createElement('button'); play.textContent="▶️ Play"; play.onclick=()=>{ ctx().resume(); playChord(notes,vol); pulseByLabel(o.label); };
+    btns.append(play);
+    card.append(meta,img,btns); cont.append(card);
+  });
+  showSelectionOverlay(); drawSelectionPath();
 }
 
-// ---------- Auto-load from URL / same-folder data.xlsx ----------
-async function loadXLSXFromURL(url){
-  try{
-    setNotice("Loading from URL…");
-    const res = await fetch(url, {cache:"no-store"});
-    if(!res.ok){ throw new Error("HTTP "+res.status); }
-    const ab = await res.arrayBuffer();
-    const wb = XLSX.read(ab, {type:"array"});
-    DB.keys=[]; DB.data={}; DB.chordIndex=new Map(); DB.allChords=[]; DB.stats={sheets:0, rows:0, rowsUsed:0, chords:0};
-    ingestXLSX(wb);
-    updateSelectors();
-    renderCards([]);
-    renderStats();
-    setNotice(DB.allChords.length ? "Loaded from URL ✔" : "Loaded from URL but found no valid chords. Check Stats.");
-  } catch(e){
-    console.error(e);
-    setNotice("Failed to load from URL: "+e.message);
-  }
-}
-document.getElementById('loadUrl').onclick = ()=>{
-  const u = document.getElementById('urlBox').value.trim();
-  if(u) loadXLSXFromURL(u);
-};
-
-function getQueryParam(name){
-  const url = new URL(window.location.href);
-  return url.searchParams.get(name);
+/* ===== SVG / Rendering ===== */
+const svg=el('sun'), gZoom=el('zoomG'), gModes=el('modesG'), gChart=el('chartG'), gSel=el('selG'), gPath=el('pathG'), gPulse=el('pulseG');
+const W=1200,H=860,CX=W/2,CY=H/2;
+function mk(tag,attr){ const e=document.createElementNS('http://www.w3.org/2000/svg',tag); for(const [k,v] of Object.entries(attr||{})) e.setAttribute(k,v); return e; }
+function polar(r,a){ const rad=a*Math.PI/180; return [CX + r*Math.cos(rad), CY + r*Math.sin(rad)]; }
+const baseCols=["#22c55e","#10b981","#06b6d4","#3b82f6","#6366f1","#a855f7","#ef4444"];
+function colorFor(B,S,ri){ if(ri!=null) return ["#7dd3fc","#93c5fd","#a7f3d0","#fde68a","#fca5a5","#c7d2fe","#99f6e4","#fecaca"][ri%8]; return baseCols[Math.max(0,modeRank(B))%baseCols.length]; }
+function node(title,x,y,r,fill){
+  const d=mk('circle',{cx:x,cy:y,r:r,fill:fill||"#93c5fd",stroke:"#0b1220","stroke-width":2,opacity:.98,class:"n","data-tip":title});
+  return d;
 }
 
-window.addEventListener('load', async ()=>{
-  const qp = getQueryParam('xlsx');
-  if(qp){
-    document.getElementById('urlBox').value = qp;
-    await loadXLSXFromURL(qp);
-    return;
-  }
-  // try same-folder data.xlsx
-  try{
-    const base = new URL(window.location.href);
-    const guess = new URL('data.xlsx', base).href;
-    const res = await fetch(guess, {method:'HEAD', cache:'no-store'});
-    if(res.ok){
-      document.getElementById('urlBox').value = guess;
-      await loadXLSXFromURL(guess);
-    }
-  } catch(e){
-    // ignore
-  }
-});
-// ------------ Keyboard shortcuts ------------
-document.addEventListener('keydown', (e)=>{
-  const tag=(e.target&&e.target.tagName)?e.target.tagName.toLowerCase():'';
-  if(tag==='input'||tag==='textarea'||tag==='select'||e.metaKey||e.ctrlKey||e.altKey){return;}
-  const k=e.key.toLowerCase();
-  if(k==='g'){ document.getElementById('gen').click(); e.preventDefault(); return; }
-  if(k==='u'){ if(canUndo()){ undo(); e.preventDefault(); } return; }
-  if(k==='r'){ if(canRedo()){ redo(); e.preventDefault(); } return; }
-  if(k>='1'&&k<='8'){
-    const idx=parseInt(k,10)-1;
-    if(idx>=0&&idx<CURRENT.length){
-      const p=parseLabel(CURRENT[idx]);
-      if(p){ const [root,qual]=p; const [notes]=build7th(root,qual);
-        const vol = Math.max(0, Math.min(1, (parseInt(document.getElementById('vol').value||"45")/100)));
-        playChord(notes, vol);
+/* ===== Stable selection endpoints ===== */
+let SEL_POS=new Map();     // label -> {x,y} (rendered each frame)
+let SEL_CHOICE=new Map();  // label -> chosen occurrence index among DB.nodeIndex.get(label)
+function showSelectionOverlay(){
+  SEL_POS=new Map();
+  while(gSel.firstChild) gSel.removeChild(gSel.firstChild);
+  const seq=CURRENT; if(!seq||!seq.length) return;
+
+  seq.forEach((o,i)=>{
+    const keyLab = normLabel(o.label);
+    const plist=DB.nodeIndex.get(keyLab)||[];
+    if(!plist.length) return;
+    let idx = SEL_CHOICE.has(keyLab) ? SEL_CHOICE.get(keyLab) : rand(plist.length);
+    if(idx>=plist.length) idx = plist.length-1;
+    SEL_CHOICE.set(keyLab, idx);
+    const p = plist[idx];
+    SEL_POS.set(keyLab,p);
+
+    const dot=mk('circle',{cx:p.x,cy:p.y,r:8,fill:"#fff",stroke:"#0b1220","stroke-width":2,class:"n","data-tip":`#${i+1} • ${o.label}`});
+    const num=mk('text',{x:p.x,y:p.y+4,'text-anchor':'middle',style:"font:700 11px system-ui; fill:#000; paint-order:stroke; stroke:#fff; stroke-width:2.5px"}); num.textContent=(i<9)?(i+1):'•';
+    dot.addEventListener('click',()=>pulseAt(p.x,p.y));
+    num.addEventListener('click',()=>pulseAt(p.x,p.y));
+    gSel.appendChild(dot); gSel.appendChild(num);
+  });
+}
+function drawSelectionPath(){
+  while(gPath.firstChild) gPath.removeChild(gPath.firstChild);
+  const seq=CURRENT; if(!seq||seq.length<2) return;
+  const pts=seq.map(o=>{ const e=SEL_POS.get(normLabel(o.label)); return e? `${e.x},${e.y}`: null; }).filter(Boolean).join(' ');
+  if(!pts) return;
+  const glow=mk('polyline',{points:pts,fill:'none',stroke:'rgba(34,211,238,.35)',"stroke-width":9,"stroke-linecap":"round","stroke-linejoin":"round"});
+  const line=mk('polyline',{points:pts,fill:'none',stroke:'rgba(34,211,238,.9)',"stroke-width":3,"stroke-linecap":"round","stroke-linejoin":"round"});
+  gPath.appendChild(glow); gPath.appendChild(line);
+}
+function pulseAt(x,y){
+  const ring=mk('circle',{cx:x,cy:y,r:9,fill:'none',stroke:'#22d3ee','stroke-width':3,opacity:.95});
+  gPulse.appendChild(ring);
+  let r=9,op=.95,c=0; (function tick(){ c++; r+=1.8; op*=.92; ring.setAttribute('r',r); ring.setAttribute('opacity',op); if(c<18) requestAnimationFrame(tick); else gPulse.removeChild(ring); })();
+}
+function pulseByLabel(label){
+  const e=SEL_POS.get(normLabel(label)) || (DB.nodeIndex.get(normLabel(label))||[])[0]; if(e) pulseAt(e.x,e.y);
+}
+
+/* ===== Main render ===== */
+function render(){
+  [gModes,gChart,gSel,gPath,gPulse].forEach(g=>{ while(g.firstChild) g.removeChild(g.firstChild); });
+  DB.nodeIndex.clear();
+
+  const k=val('rootSel'), b=val('baseSel'), s=val('subSel');
+  const nodeR=parseInt(val('nodeR')), gap=parseInt(val('rowGap'));
+  const mini = el('mini').checked, miniBy = el('miniGroup').value; // 'base' | 'sub'
+  const miniSpace = parseInt(val('miniSpace')); // controls cluster separation
+
+  const ring0=110, ringSub=ring0+64, ringFam=ringSub+36;
+  const a0=-90;
+
+  const scenario = (k!=="All Keys" && b!=="All Base Modes" && s!=="All Sub Modes") ? 1 :
+                   (k!=="All Keys" && b!=="All Base Modes" && s==="All Sub Modes") ? 2 :
+                   (k!=="All Keys" && b==="All Base Modes" && s==="All Sub Modes") ? 3 : 0;
+
+  let centerLabel = "All Keys";
+  if(scenario===1) centerLabel = displaySubLabel(s);
+  else if(scenario===2) centerLabel = `${k} ${b.replace(/^[A-G](?:#|b)?\s+/,"")}`;
+  else if(scenario===3) centerLabel = k;
+  gModes.appendChild(node(centerLabel, CX, CY, 16, "#fff"));
+
+  if(scenario===1){
+    // Specific sub mode
+    const famOrder=familiesFor(k,b);
+    const rows = (((DB.data[k]||{})[b]||{})[s]||[]);
+    const famMap=new Map(); rows.forEach(r=>{ if(r.family) famMap.set(normLabel(r.family), r.degrees.map(normLabel)); });
+    const step=360/7;
+    { const [sx,sy]=polar(ringSub,a0); gModes.appendChild(node(displaySubLabel(s), sx,sy,7, "#93c5fd")); }
+    for(let i=0;i<7;i++){
+      const a=a0 + i*step;
+      const fam=famOrder[i];
+      const [fx,fy]=polar(ringFam,a);
+      gModes.appendChild(node(fam, fx,fy,7, baseCols[i%7]));
+      const degs=famMap.get(normLabel(fam)) || (rows[0]?.degrees||[]).map(normLabel);
+      for(let di=0; di<Math.min(7,degs.length); di++){
+        const [x,y]=polar(ringFam+30+di*gap, a);
+        const lab=normLabel(degs[di]);
+        const d=node(lab,x,y,nodeR, colorFor(b,s,di));
+        gChart.appendChild(d);
+        (DB.nodeIndex.get(lab) || DB.nodeIndex.set(lab,[]), DB.nodeIndex.get(lab)).push({x,y});
       }
-      e.preventDefault();
     }
   }
+  else if(scenario===2){
+    // Specific base (All Subs)
+    const subsUnique = uniqueSubsForBase(k,b); // de-dup display
+    if(mini && miniBy==='sub'){
+      // *** Mini clusters grouped by SUB ***
+      const step=360/Math.max(1,subsUnique.length);
+      const ringCluster = 200 + miniSpace * 1.4; // spread control
+      subsUnique.forEach((obj,si)=>{
+        const S=obj.value, Slabel=obj.disp;
+        const a=a0+si*step; const [cx,cy]=polar(ringCluster,a);
+        // center label: the Sub once (no spam)
+        gModes.appendChild(node(Slabel, cx, cy, 7.2, "#a78bfa"));
+        const rows = (((DB.data[k]||{})[b]||{})[S]||[]);
+        const famOrder=familiesFor(k,b);
+        const famMap=new Map(); rows.forEach(r=>{ if(r.family) famMap.set(normLabel(r.family), r.degrees.map(normLabel)); });
+        // families around sub center
+        for(let fi=0; fi<7; fi++){
+          const aa = (a-90) + fi*(360/Math.max(7,7)); // equal wedges inside the cluster
+          const [fx,fy]=[ cx + Math.cos(aa*Math.PI/180)*74, cy + Math.sin(aa*Math.PI/180)*74 ];
+          gModes.appendChild(node(famOrder[fi], fx,fy,6, baseCols[fi%7]));
+          const degs=famMap.get(normLabel(famOrder[fi])) || (rows[fi]?.degrees||rows[0]?.degrees||[]).map(normLabel);
+          for(let di=0; di<Math.min(7,degs.length); di++){
+            const rr = 74 + 20 + di*(gap*0.75);
+            const [x,y]=[ cx + Math.cos(aa*Math.PI/180)*rr, cy + Math.sin(aa*Math.PI/180)*rr ];
+            const lab=normLabel(degs[di]);
+            const d=node(lab,x,y,nodeR, colorFor(b,S,di));
+            gChart.appendChild(d);
+            (DB.nodeIndex.get(lab) || DB.nodeIndex.set(lab,[]), DB.nodeIndex.get(lab)).push({x,y});
+          }
+        }
+      });
+    } else {
+      // Radial (non-mini) — still uses unique sub labels, no duplication
+      const total=7*subsUnique.length; const step=360/Math.max(1,total);
+      let si=0;
+      subsUnique.forEach(({value:S, disp})=>{
+        const rows = (((DB.data[k]||{})[b]||{})[S]||[]);
+        const famOrder=familiesFor(k,b);
+        const famMap=new Map(); rows.forEach(r=>{ if(r.family) famMap.set(normLabel(r.family), r.degrees.map(normLabel)); });
+        for(let fi=0; fi<7; fi++){
+          const a=a0 + (si*step);
+          const [sx,sy]=polar(ring0, a);
+          gModes.appendChild(node(disp, sx,sy,4.8, "#a78bfa"));
+          const fam=famOrder[fi];
+          const [fx,fy]=polar(ring0+28, a);
+          gModes.appendChild(node(fam, fx,fy,6.2, baseCols[fi%7]));
+          const degs=famMap.get(normLabel(fam)) || (rows[fi]?.degrees||rows[0]?.degrees||[]).map(normLabel);
+          for(let di=0; di<Math.min(7,degs.length); di++){
+            const [x,y]=polar(ring0+28+26+di*gap, a);
+            const lab=normLabel(degs[di]);
+            const d=node(lab,x,y,nodeR, colorFor(b,S,di));
+            gChart.appendChild(d);
+            (DB.nodeIndex.get(lab) || DB.nodeIndex.set(lab,[]), DB.nodeIndex.get(lab)).push({x,y});
+          }
+          si++;
+        }
+      });
+    }
+  }
+  else if(scenario===3){
+    // All base + All sub (one key) — MINI clusters by BASE, spaced with slider
+    const bases = Object.keys(DB.data[k]||{}).sort(sortModesCW);
+    const step=360/Math.max(1,bases.length);
+    const ringCluster=200 + miniSpace * 1.4; // spacing control
+
+    if(mini){
+      bases.forEach((B,bi)=>{
+        const a=a0+bi*step; const [cx,cy]=polar(ringCluster,a);
+        // center label: the Base once
+        gModes.appendChild(node(`${k} ${B.replace(/^[A-G](?:#|b)?\s+/,"")}`, cx, cy, 7.5, "#22c55e"));
+
+        // de-dup sub labels within this base
+        const subsU = uniqueSubsForBase(k,B);
+        const st=360/Math.max(1,7*subsU.length);
+        let blockStart = 0;
+        subsU.forEach(({value:S, disp})=>{
+          // one sub label per sub (centered in its 7-slice block)
+          const aSub = (a-90) + (blockStart+3.5)*st;
+          const [sx,sy]=[ cx + Math.cos(aSub*Math.PI/180)*56, cy + Math.sin(aSub*Math.PI/180)*56 ];
+          gModes.appendChild(node(disp, sx,sy,4.2, "#a78bfa"));
+
+          const rows = (((DB.data[k]||{})[B]||{})[S]||[]);
+          const famOrder=familiesFor(k,B);
+          const famMap=new Map(); rows.forEach(r=>{ if(r.family) famMap.set(normLabel(r.family), r.degrees.map(normLabel)); });
+
+          for(let fi=0; fi<7; fi++){
+            const aa = (a-90) + (blockStart+fi)*st;
+            const [fx,fy]=[ cx + Math.cos(aa*Math.PI/180)*84, cy + Math.sin(aa*Math.PI/180)*84 ];
+            gModes.appendChild(node(famOrder[fi], fx,fy,6, baseCols[fi%7]));
+            const degs=famMap.get(normLabel(famOrder[fi])) || (rows[fi]?.degrees||rows[0]?.degrees||[]).map(normLabel);
+            for(let di=0; di<Math.min(7,degs.length); di++){
+              const rr = 84 + 22 + di*(gap*0.75);
+              const [x,y]=[ cx + Math.cos(aa*Math.PI/180)*rr, cy + Math.sin(aa*Math.PI/180)*rr ];
+              const lab=normLabel(degs[di]);
+              const d=node(lab,x,y,nodeR, colorFor(B,S,di));
+              gChart.appendChild(d);
+              (DB.nodeIndex.get(lab) || DB.nodeIndex.set(lab,[]), DB.nodeIndex.get(lab)).push({x,y});
+            }
+          }
+          blockStart += 7;
+        });
+      });
+    } else {
+      // Non-mini fallback scatter
+      const groups=[];
+      for(const [B,subs] of Object.entries(DB.data[k]||{})){
+        for(const [S,rows] of Object.entries(subs)) groups.push({B,S,rows});
+      }
+      const step2=360/Math.max(1,groups.length);
+      groups.forEach((G,gi)=>{
+        const a=a0+gi*step2;
+        for(let r=0; r<G.rows.length; r++){
+          const row=G.rows[r];
+          for(let di=0; di<Math.min(7,row.degrees.length); di++){
+            const [x,y]=polar(130 + r*10 + di*gap, a);
+            const lab=normLabel(row.degrees[di]);
+            const d=node(lab,x,y,nodeR, colorFor(G.B,G.S,di));
+            gChart.appendChild(d);
+            (DB.nodeIndex.get(lab) || DB.nodeIndex.set(lab,[]), DB.nodeIndex.get(lab)).push({x,y});
+          }
+        }
+      });
+    }
+  } else {
+    // Mixed/fallback (All Keys or other combos)
+    const groups=[];
+    for(const K of (k==="All Keys"? DB.keys : [k])){
+      for(const [B,subs] of Object.entries(DB.data[K]||{})){
+        for(const [S,rows] of Object.entries(subs)) groups.push({K,B,S,rows});
+      }
+    }
+    const step=360/Math.max(1,groups.length);
+    groups.forEach((G,gi)=>{
+      const a=a0+gi*step;
+      for(let r=0; r<G.rows.length; r++){
+        const row=G.rows[r];
+        for(let di=0; di<Math.min(7,row.degrees.length); di++){
+          const [x,y]=polar(130 + r*10 + di*gap, a);
+          const lab=normLabel(row.degrees[di]);
+          const d=node(lab,x,y,parseInt(val('nodeR')), colorFor(G.B,G.S,di));
+          gChart.appendChild(d);
+          (DB.nodeIndex.get(lab) || DB.nodeIndex.set(lab,[]), DB.nodeIndex.get(lab)).push({x,y});
+        }
+      }
+    });
+  }
+
+  el('vizMeta').textContent = `${k} • ${b} • ${s}`;
+  showSelectionOverlay(); drawSelectionPath();
+}
+
+/* ===== Misc UI ===== */
+function el(id){return document.getElementById(id)}
+function val(id){return el(id).value}
+
+el('openSettings').onclick=()=>{ el('settings').style.display='flex'; };
+el('closeSettings').onclick=()=>{ el('settings').style.display='none'; };
+
+el('themeBtn').onclick=()=>{ const root=document.documentElement; const light=root.getAttribute('data-theme')==='light'; root.setAttribute('data-theme', light?'dark':'light'); el('themeBtn').textContent = light ? '🌙' : '☀️'; };
+
+el('rootSel').onchange = onRootChange;
+el('baseSel').onchange = onBaseChange;
+el('subSel').onchange  = ()=>{ SEL_CHOICE.clear(); refreshStartChoices(); render(); };
+['nodeR','rowGap','mini','miniSpace','miniGroup'].forEach(id => { el(id).oninput=render; el(id).onchange=render; });
+
+el('gen').onclick=()=>{ const n=Math.max(1,Math.min(16,parseInt(val('count')||"4"))); const seq=sample(n); el('notice').textContent=seq.length? "":"No chords for this selection."; renderCards(seq); };
+el('copy').onclick=async()=>{ const txt=CURRENT.map(x=>x.label).join(', '); try{ await navigator.clipboard.writeText(txt); el('notice').textContent="Copied."; setTimeout(()=>el('notice').textContent="",1000);}catch(e){ el('notice').textContent="Copy failed."; } };
+el('resetAll').onclick=()=>{ el('count').value=4; el('vol').value=45; el('spicy').value=0; el('noRepeat').checked=true; el('mini').checked=true; el('miniSpace').value=80; el('miniGroup').value='base'; el('rootSel').value='All Keys'; el('baseSel').innerHTML=`<option>All Base Modes</option>`; el('subSel').innerHTML=`<option>All Sub Modes</option>`; scale=1; tx=0; ty=0; applyZoom(); SEL_CHOICE.clear(); render(); el('cards').innerHTML=""; CURRENT=[]; };
+
+/* Random picks */
+el('rootRnd').onclick=()=>{ if(!DB.keys.length) return; el('rootSel').value=DB.keys[rand(DB.keys.length)]; onRootChange(); };
+el('baseRnd').onclick=()=>{ const k=val('rootSel'); if(k==="All Keys") return; const bases=Object.keys(DB.data[k]||{}).sort(sortModesCW); if(!bases.length) return; el('baseSel').value=bases[rand(bases.length)]; onBaseChange(); };
+el('subRnd').onclick=()=>{ const k=val('rootSel'), b=val('baseSel'); if(k==="All Keys"||b==="All Base Modes") return; const subs=uniqueSubsForBase(k,b); if(!subs.length) return; el('subSel').value=subs[rand(subs.length)].value; SEL_CHOICE.clear(); render(); };
+
+/* Hotkeys: 1..8 play items #1..#8; G generate; R reset */
+window.addEventListener('keydown',(e)=>{
+  const tag=(e.target&&e.target.tagName||'').toLowerCase();
+  if(tag==='input' || tag==='select' || tag==='textarea') return;
+  const k=e.key;
+  if(k>='1' && k<='8'){ const idx=parseInt(k,10)-1; const o=CURRENT[idx]; if(o){ const [root,q]=parseLabel(o.label); const [notes]=build7th(root,q); ctx().resume(); playChord(notes, parseInt(val('vol'))/100); pulseByLabel(o.label); e.preventDefault(); } }
+  if(k.toLowerCase()==='g'){ e.preventDefault(); el('gen').click(); }
+  if(k.toLowerCase()==='r'){ e.preventDefault(); el('resetAll').click(); }
 });
+
+/* Tooltips — ONLY for nodes with class 'n' */
+const tip=el('tip');
+function setTip(txt,x,y){ tip.textContent=txt; tip.style.left=(x+10)+'px'; tip.style.top=(y+10)+'px'; tip.style.opacity=1; }
+function hideTip(){ tip.style.opacity=0; }
+svg.addEventListener('mousemove',(e)=>{
+  const t=e.target;
+  if(t && t.classList && t.classList.contains('n')){
+    const txt=t.getAttribute('data-tip')||'';
+    if(txt){ setTip(txt,e.clientX,e.clientY); return; }
+  }
+  hideTip();
+});
+svg.addEventListener('mouseleave', hideTip);
+
+/* Pan + NO scroll-wheel zoom (blocked) */
+let scale=1, tx=0, ty=0, panning=false, start={x:0,y:0};
+function applyZoom(){ gZoom.setAttribute('transform',`translate(${tx},${ty}) scale(${scale})`); }
+svg.addEventListener('wheel', (e)=>{ e.preventDefault(); }, {passive:false});
+svg.addEventListener('mousedown',(e)=>{ panning=true; start={x:e.clientX,y:e.clientY}; });
+window.addEventListener('mouseup',()=>{ panning=false; });
+window.addEventListener('mousemove',(e)=>{ if(!panning) return; const dx=e.clientX-start.x, dy=e.clientY-start.y; tx+=dx; ty+=dy; start={x:e.clientX,y:e.clientY}; applyZoom(); });
+el('zoomIn').onclick = ()=>{ const s2=Math.min(10,scale*1.2); tx=CX-(CX-tx)*(s2/scale); ty=CY-(CY-ty)*(s2/scale); scale=s2; applyZoom(); };
+el('zoomOut').onclick= ()=>{ const s2=Math.max(0.5,scale/1.2); tx=CX-(CX-tx)*(s2/scale); ty=CY-(CY-ty)*(s2/scale); scale=s2; applyZoom(); };
+el('zoomReset').onclick=()=>{ scale=1; tx=0; ty=0; applyZoom(); };
+el('redraw').onclick=render;
+
+/* Loaders + autoload */
+async function loadFromArrayBuffer(ab){
+  try{
+    const wb=XLSX.read(ab,{type:"array"}); ingestXLSX(wb); updateSelectors(); render();
+    el('parseStats').innerHTML = `Sheets: ${DB.stats.sheets}<br>Rows: ${DB.stats.rows}<br>Rows used: ${DB.stats.rowsUsed}<br>Chord cells: ${DB.stats.chordCells}`;
+    setInitialDefaults();
+  }catch(e){ el('parseStats').textContent='Load failed: '+e.message; console.error(e); }
+}
+function setInitialDefaults(){
+  const rootSel=el('rootSel'); if([...rootSel.options].some(o=>o.value==='C')){ rootSel.value='C'; onRootChange(); } else { onRootChange(); }
+  const baseSel=el('baseSel'); const ionBase=[...baseSel.options].find(o=>/ionian/i.test(o.value)); if(ionBase){ baseSel.value=ionBase.value; onBaseChange(); }
+  const subSel=el('subSel'); const ionSub=[...subSel.options].find(o=>/ionian\s+ionians/i.test(o.textContent)); if(ionSub){ subSel.value=ionSub.value; render(); }
+}
+el('file').addEventListener('change', async (ev)=>{ const f=ev.target.files?.[0]; if(!f) return; const ab=await f.arrayBuffer(); await loadFromArrayBuffer(ab); });
+el('dataURLLoad').onclick = async ()=>{
+  const url=val('dataURL').trim(); if(!url){ el('parseStats').textContent='Enter a URL'; return; }
+  try{ el('parseStats').textContent='Loading…'; const res=await fetch(url,{cache:'no-store'}); if(!res.ok) throw new Error('HTTP '+res.status); const ab=await res.arrayBuffer(); await loadFromArrayBuffer(ab); el('settings').style.display='none'; }
+  catch(e){ el('parseStats').innerHTML=`Load failed: ${e.message}<br>Tip: CORS can block remote files — try another host or the file upload.`; }
+};
+/* Autoload: ?xlsx=… override, else use your GitHub URL by default */
+(function(){
+  const p=new URLSearchParams(location.search);
+  const url = p.get('xlsx') || 'https://santismo.github.io/ChordWeb/data.xlsx';
+  el('dataURL').value = url;
+  (async()=>{ try{ el('parseStats').textContent='Loading…'; const r=await fetch(url,{cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); const ab=await r.arrayBuffer(); await loadFromArrayBuffer(ab); } catch(e){ el('parseStats').innerHTML=`Auto-load failed: ${e.message}<br>Open ⚙️ Settings to load manually.`; }})();
+})();
 </script>
 </body>
 </html>
