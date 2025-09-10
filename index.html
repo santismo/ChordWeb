@@ -62,6 +62,7 @@
       <label>Base</label><select id="baseSel"><option>All Base Modes</option></select><button id="baseRnd" class="iconbtn">🎲</button>
       <label>Sub</label><select id="subSel"><option>All Sub Modes</option></select><button id="subRnd" class="iconbtn">🎲</button>
       <label>Start</label><select id="startSel"><option>(none)</option></select>
+      <label>End</label><select id="endSel"><option>(none)</option></select>
     </div>
     <div class="row" style="gap:12px">
       <button id="gen" class="pill accent">🌀 Generate</button>
@@ -252,7 +253,7 @@ function updateSelectors(){
   rootSel.innerHTML = `<option>All Keys</option>` + DB.keys.map(k=>`<option>${k}</option>`).join("");
   document.getElementById('baseSel').innerHTML=`<option>All Base Modes</option>`;
   document.getElementById('subSel').innerHTML = `<option>All Sub Modes</option>`;
-  refreshStartChoices();
+  refreshChoices();
 }
 function onRootChange(){
   const k=val('rootSel');
@@ -265,7 +266,7 @@ function onRootChange(){
     subSel.innerHTML = `<option>All Sub Modes</option>`;
   }
   SEL_CHOICE.clear();
-  refreshStartChoices(); render();
+  render();
 }
 function onBaseChange(){
   const k=val('rootSel'), b=val('baseSel');
@@ -276,22 +277,35 @@ function onBaseChange(){
     subSel.innerHTML = `<option>All Sub Modes</option>` + subs.map(s=>`<option value="${s.value}">${s.disp}</option>`).join("");
   }
   SEL_CHOICE.clear();
-  refreshStartChoices(); render();
+  render();
 }
-function refreshStartChoices(){
-  const key=val('rootSel');
-  const allowedKeys = key==="All Keys"? DB.keys : [key];
-  const set=new Set();
-  for(const K of allowedKeys){
-    const bases=DB.data[K]||{};
-    for(const [B,subs] of Object.entries(bases)){
-      for(const [S,rows] of Object.entries(subs)){
-        for(const row of rows) for(const ch of row.degrees) set.add(normLabel(ch));
-      }
-    }
-  }
-  const startSel=document.getElementById('startSel');
-  startSel.innerHTML=['(none)',...Array.from(set).filter(Boolean).sort()].map(v=>`<option>${v}</option>`).join("");
+
+/* NEW: make Start/End reflect what’s actually drawn */
+function refreshChoices(){  // simple delegator
+  refreshChoicesFromViz();
+}
+
+function refreshChoicesFromViz(){
+  // If you want to hide Start/End when Root = All Keys, uncomment next 5 lines:
+  // const k = val('rootSel');
+  // if (k === 'All Keys') {
+  //   const opts = ['(none)'].map(v => `<option>${v}</option>`).join('');
+  //   el('startSel').innerHTML = opts; el('endSel').innerHTML = opts; return;
+  // }
+
+  const labels = Array.from(DB.nodeIndex.keys()).sort();
+  const opts = ['(none)', ...labels].map(v => `<option>${v}</option>`).join('');
+
+  // preserve previous selections if they still exist
+  const keep = (selId) => {
+    const sel = el(selId);
+    const prev = sel.value || '(none)';
+    sel.innerHTML = opts;
+    sel.value = labels.includes(prev) ? prev : '(none)';
+  };
+
+  keep('startSel');
+  keep('endSel');
 }
 
 /* ===== Sampling ===== */
@@ -313,45 +327,130 @@ function bucketsFor(k,b,s){
   }
   return out;
 }
-function sample(n){
-  const k=val('rootSel'), b=val('baseSel'), s=val('subSel');
-  const spicy=parseInt(val('spicy'))/100;
-  const start=val('startSel'); const startOpt=(start && start!=="(none)")? start:null;
 
-  const groups=bucketsFor(k,b,s);
-  const pool=[]; 
-  for(const g of groups){
+function sample(n){
+  const k = val('rootSel'), b = val('baseSel'), s = val('subSel');
+  const spicy = parseInt(val('spicy'))/100;
+
+  const startSel = val('startSel');
+  const endSel   = val('endSel');
+  const startOpt = (startSel && startSel !== "(none)") ? normLabel(startSel) : null;
+  const endOpt   = (endSel   && endSel   !== "(none)") ? normLabel(endSel)   : null;
+
+  // Build constrained pool from current settings
+  const groups = bucketsFor(k,b,s);
+  const pool = [];
+  for (const g of groups){
     g.row.forEach((label,ci)=>{
       const lab = normLabel(label);
-      pool.push({label:lab, key:g.key,base:g.base,sub:g.sub,family:g.family,ci});
+      pool.push({label: lab, key:g.key, base:g.base, sub:g.sub, family:g.family, ci});
     });
   }
-  if(!pool.length) return [];
-
-  for(let i=pool.length-1;i>0;i--){ const j=rand(i+1); [pool[i],pool[j]]=[pool[j],pool[i]]; }
-
-  const out=[]; const used=new Set();
-  function biasedPick(prev){
-    if(!prev || spicy<=0) return pool.pop();
-    const A=chordPCSet(prev.label);
-    const k=Math.min(12,pool.length);
-    const cand=pool.slice(-k).map((o,idx)=>({idx:pool.length-k+idx,o,sc:jaccard(A,chordPCSet(o.label))})).sort((x,y)=>y.sc-x.sc);
-    const top=Math.max(1, Math.round(1+spicy*5));
-    const choice=cand[rand(Math.min(top,cand.length))];
-    return pool.splice(choice.idx,1)[0];
+  if (!pool.length) {
+    el('notice').textContent = "No chords available for this selection.";
+    return [];
   }
 
-  if(startOpt){
-    const idx=pool.findIndex(o=>o.label===startOpt);
-    const pre=(idx>=0)? pool.splice(idx,1)[0] : {label:startOpt,key:k,base:b,sub:s,family:"",ci:0};
-    out.push(pre); used.add(pre.label);
+  // Fast lookups / helpers
+  const allowed = new Set(pool.map(p => p.label));
+  const used = new Set();
+
+  function popExact(lab){
+    const idx = pool.findIndex(o => o.label === lab);
+    if (idx < 0) return null;
+    return pool.splice(idx,1)[0];
   }
-  while(out.length<n && pool.length){
-    const p=biasedPick(out[out.length-1]);
-    if(!el('noRepeat').checked || !used.has(p.label)){ out.push(p); used.add(p.label); }
+
+  function biasedPick(prev, bannedLabel){
+    if (!pool.length) return null;
+    const candidates = bannedLabel ? pool.filter(o => o.label !== bannedLabel) : pool.slice();
+    if (!candidates.length) return null;
+
+    if (!prev || spicy <= 0) {
+      const pick = candidates[candidates.length-1];
+      const idx = pool.findIndex(o => o === pick);
+      return pool.splice(idx,1)[0];
+    }
+
+    const A = chordPCSet(prev.label);
+    const kTop = Math.min(12, candidates.length);
+    const tail = candidates.slice(-kTop).map((o, i) => ({
+      poolIdx: pool.findIndex(p => p === candidates[candidates.length-kTop+i]),
+      obj: o,
+      sc: jaccard(A, chordPCSet(o.label))
+    })).sort((x,y)=>y.sc-x.sc);
+
+    const top = Math.max(1, Math.round(1 + spicy*5));
+    const choice = tail[Math.floor(Math.random() * Math.min(top, tail.length))];
+    return pool.splice(choice.poolIdx, 1)[0];
+  }
+
+  // Validate Start/End against allowed pool
+  if (startOpt && !allowed.has(startOpt)) {
+    el('notice').textContent = `Start "${startOpt}" isn’t available for these settings.`;
+    return [];
+  }
+  if (endOpt && !allowed.has(endOpt)) {
+    el('notice').textContent = `End "${endOpt}" isn’t available for these settings.`;
+    return [];
+  }
+
+  // Shuffle pool for randomness baseline
+  for (let i = pool.length-1; i > 0; i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+
+  const out = [];
+  let startPick = null, endPick = null;
+
+  // Place Start first, if any
+  if (startOpt) {
+    startPick = popExact(startOpt);
+    out.push(startPick);
+    used.add(startPick.label);
+  }
+
+  // Reserve End (remove from pool, but don't add yet)
+  if (endOpt && (!startPick || endOpt !== startPick.label)) {
+    endPick = popExact(endOpt);
+  }
+
+  // Fill middle, honoring "noRepeat" and not stealing reserved end
+  const banEndLabel = endPick ? endPick.label : null;
+  while (out.length < n - (endPick ? 1 : 0)) {
+    const prev = out[out.length-1];
+    const pick = biasedPick(prev, banEndLabel);
+    if (!pick) break;
+    if (!el('noRepeat').checked || !used.has(pick.label)) {
+      out.push(pick);
+      used.add(pick.label);
+    }
+  }
+
+  // Add End as last, if requested
+  if (endPick) {
+    while (out.length < n - 1) {
+      const prev = out[out.length-1];
+      const pick = biasedPick(prev, banEndLabel);
+      if (!pick) break;
+      if (!el('noRepeat').checked || !used.has(pick.label)) {
+        out.push(pick);
+        used.add(pick.label);
+      }
+    }
+    out.push(endPick);
+    used.add(endPick.label);
+  }
+
+  if (!out.length) {
+    el('notice').textContent = "Couldn’t build a sequence with these constraints.";
+  } else {
+    el('notice').textContent = "";
   }
   return out;
 }
+
 
 /* ===== Cards & audio ===== */
 let audioCtx=null; function ctx(){ if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)(); return audioCtx; }
@@ -376,7 +475,7 @@ function drawKeys(notes, rootPC){
   svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
 
   const keys=[];
-  const whites=[]; let count=0, midi=48; // start at C3
+  const whites=[]; let count=0, midi=48;
   while(count<22){
     const pc = ((midi%12)+12)%12;
     if(![1,3,6,8,10].includes(pc)){ whites.push(midi); count++; }
@@ -470,8 +569,8 @@ function node(title,x,y,r,fill){
 }
 
 /* ===== Stable selection endpoints ===== */
-let SEL_POS=new Map();     
-let SEL_CHOICE=new Map();  
+let SEL_POS=new Map();
+let SEL_CHOICE=new Map();
 function showSelectionOverlay(){
   SEL_POS=new Map();
   while(gSel.firstChild) gSel.removeChild(gSel.firstChild);
@@ -513,14 +612,12 @@ function pulseByLabel(label){
 }
 
 /* ===== Degree helpers ===== */
-// Exact degrees for (K, B, S, Family) — returns [] if not found
 function degreesForFamilyExact(K,B,S,fam){
   const subs = ((DB.data[K]||{})[B]||{});
   const rows = subs[S] || [];
   const hit = rows.find(r => normLabel(r.family) === normLabel(fam));
   return hit && Array.isArray(hit.degrees) ? hit.degrees.map(normLabel) : [];
 }
-// Fallback used elsewhere
 function degreesForFamilyAnySub(K,B,fam){
   const subs = ((DB.data[K]||{})[B]||{});
   for(const [S,rows] of Object.entries(subs)){
@@ -580,7 +677,6 @@ function render(){
       }
     }
 
-    // Endpoints for all selected chords (even if degree index > 7)
     const LIDX = new Map();
     rows.forEach(r=>{
       const famName = normLabel(r.family||"");
@@ -720,10 +816,9 @@ function render(){
     }
   }
   else if (k==="All Keys" && b==="All Base Modes" && s==="All Sub Modes" && mini) {
-    // === All ROOTS • full mini-universes (Key → Bases → Subs → Families → ALL degrees) ===
     const keys = sortKeysChromatic(DB.keys, 'C');
     const keyStep = 360/Math.max(1, keys.length);
-    const ringCluster = 240 + parseInt(val('miniSpace')) * 1.35; // distance of each key's universe from center
+    const ringCluster = 240 + parseInt(val('miniSpace')) * 1.35;
 
     const nodeR = parseInt(val('nodeR'));
     const gapVal = parseInt(val('rowGap'));
@@ -732,10 +827,8 @@ function render(){
       const aKey = a0 + ki*keyStep;
       const [ux,uy] = polar(ringCluster, aKey);
 
-      // Universe center = Key
       gModes.appendChild(node(K, ux, uy, 8.5, "#fff"));
 
-      // Level 1: Bases
       const bases = Object.keys(DB.data[K]||{}).sort(sortModesCW);
       const baseStep = 360/Math.max(1, bases.length);
       const rBase = 74;
@@ -745,7 +838,6 @@ function render(){
         const [bx,by] = [ ux + Math.cos(aBase*Math.PI/180)*rBase, uy + Math.sin(aBase*Math.PI/180)*rBase ];
         gModes.appendChild(node(B.replace(/^[A-G](?:#|b)?\s+/,""), bx, by, 6.2, baseCols[bi%7]));
 
-        // Level 2: Subs (unique)
         const subsU = uniqueSubsForBase(K, B);
         const subStep = (baseStep) / Math.max(1, subsU.length);
         const rSub = rBase + 28;
@@ -756,7 +848,6 @@ function render(){
           const [sx,sy] = [ ux + Math.cos(aSub*Math.PI/180)*rSub, uy + Math.sin(aSub*Math.PI/180)*rSub ];
           gModes.appendChild(node(Slabel, sx, sy, 4.8, subFamilyColor(S)));
 
-          // Level 3: Families (7)
           const famOrder = familiesFor(K, B);
           const famStep = subStep / 7;
           const rFam = rSub + 22;
@@ -766,7 +857,6 @@ function render(){
             const [fx,fy] = [ ux + Math.cos(aFam*Math.PI/180)*rFam, uy + Math.sin(aFam*Math.PI/180)*rFam ];
             gModes.appendChild(node(famOrder[fi], fx, fy, 4.2, baseCols[fi%7]));
 
-            // Level 4: ALL degrees for exact (K,B,S,family)
             const degrees = degreesForFamilyExact(K, B, S, famOrder[fi]);
             for (let di=0; di<degrees.length; di++){
               const rr = rFam + 16 + di*(gapVal*0.65);
@@ -783,7 +873,6 @@ function render(){
     });
 
   } else {
-    // Mixed/fallback scatter
     const keysOrdered = (k==="All Keys") ? sortKeysChromatic(DB.keys, 'C') : [k];
     const groups=[];
     for (const K of keysOrdered){
@@ -808,7 +897,10 @@ function render(){
   }
 
   el('vizMeta').textContent = `${k} • ${b} • ${s}`;
-  showSelectionOverlay(); drawSelectionPath();
+  showSelectionOverlay();
+  drawSelectionPath();
+  // Repopulate Start/End with exactly what’s visible in the viz
+  refreshChoicesFromViz();
 }
 
 /* ===== Misc UI ===== */
@@ -822,7 +914,7 @@ el('themeBtn').onclick=()=>{ const root=document.documentElement; const light=ro
 
 el('rootSel').onchange = onRootChange;
 el('baseSel').onchange = onBaseChange;
-el('subSel').onchange  = ()=>{ SEL_CHOICE.clear(); refreshStartChoices(); render(); };
+el('subSel').onchange  = ()=>{ SEL_CHOICE.clear(); render(); };
 ['nodeR','rowGap','mini','miniSpace','miniGroup'].forEach(id => { el(id).oninput=render; el(id).onchange=render; });
 
 el('gen').onclick=()=>{ const n=Math.max(1,Math.min(16,parseInt(val('count')||"4"))); const seq=sample(n); el('notice').textContent=seq.length? "":"No chords for this selection."; renderCards(seq); };
