@@ -80,7 +80,7 @@
       <div class="viztools">
         <label>Dot r</label><input id="nodeR" type="range" min="3" max="12" step="1" value="6">
         <label>Gap</label><input id="rowGap" type="range" min="24" max="260" step="1" value="64">
-        <label>Mini space</label><input id="miniSpace" type="range" min="0" max="300" step="1" value="80" title="Distance between mini clusters">
+        <label>Mini space</label><input id="miniSpace" type="range" min="0" max="1200" step="1" value="80" title="Distance between mini clusters">
         <label>Mini group by</label>
         <select id="miniGroup" title="How to group mini constellations when All Sub Modes is selected">
           <option value="base" selected>Base</option>
@@ -807,11 +807,11 @@ if(scenario===1){
 
           // Ring 3: a few chord degrees for that family (kept small for readability)
           const {degrees, sub} = degreesForFamilyAnySub(K, B, famOrder[fi]);
-          const take = Math.min(3, degrees.length);            // show up to 3 to keep it tidy
+          //const take = Math.min(3, degrees.length);            // show up to 3 to keep it tidy
           const gap = parseInt(val('rowGap'));                 // reuse your existing slider
           const nodeR = parseInt(val('nodeR'));
 
-          for(let di=0; di<take; di++){
+          for(let di = 0; di < degrees.length; di++) {
             const rr = r2 + 18 + di*(gap*0.65);
             const xx = cx + Math.cos(aa2*Math.PI/180)*rr;
             const yy = cy + Math.sin(aa2*Math.PI/180)*rr;
@@ -909,7 +909,7 @@ svg.addEventListener('mousedown',(e)=>{ panning=true; start={x:e.clientX,y:e.cli
 window.addEventListener('mouseup',()=>{ panning=false; });
 window.addEventListener('mousemove',(e)=>{ if(!panning) return; const dx=e.clientX-start.x, dy=e.clientY-start.y; tx+=dx; ty+=dy; start={x:e.clientX,y:e.clientY}; applyZoom(); });
 el('zoomIn').onclick = ()=>{ const s2=Math.min(10,scale*1.2); tx=CX-(CX-tx)*(s2/scale); ty=CY-(CY-ty)*(s2/scale); scale=s2; applyZoom(); };
-el('zoomOut').onclick= ()=>{ const s2=Math.max(0.5,scale/1.2); tx=CX-(CX-tx)*(s2/scale); ty=CY-(CY-ty)*(s2/scale); scale=s2; applyZoom(); };
+el('zoomOut').onclick= ()=>{ const s2=Math.max(0.05,scale/1.2); tx=CX-(CX-tx)*(s2/scale); ty=CY-(CY-ty)*(s2/scale); scale=s2; applyZoom(); };
 el('zoomReset').onclick=()=>{ scale=1; tx=0; ty=0; applyZoom(); };
 el('redraw').onclick=render;
 
