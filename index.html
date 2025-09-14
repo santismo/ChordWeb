@@ -33,6 +33,15 @@
   svg#sun{width:100%;height:860px;cursor:grab;background:radial-gradient(ellipse at 50% 50%, rgba(255,255,255,.04), transparent 55%)}
   svg#sun:active{cursor:grabbing}
   .tooltip{position:fixed;pointer-events:none;background:#111;border:1px solid #333;color:#fff;padding:6px 8px;border-radius:8px;font-size:12px;opacity:0;transition:opacity .08s}
+
+  /* Quick hide for controls in PMI mode */
+  .hide{display:none !important}
+
+  /* Explain panel */
+  #explainWrap h3{margin:.3rem 0 .6rem;font-size:14px}
+  #explainList{display:grid;gap:.35rem}
+  .exline{padding:.5rem .6rem;border:1px dashed var(--border);border-radius:12px;font-size:13px;background:rgba(148,163,184,.06)}
+  .tag{display:inline-block;margin-left:.4rem;padding:.1rem .45rem;border-radius:999px;border:1px solid var(--border);font-size:11px;background:rgba(37,99,235,.15)}
 </style>
 </head>
 <body>
@@ -57,10 +66,14 @@
       <label title="Avoid duplicate names in one batch"><input id="noRepeat" type="checkbox" checked/> No repeat</label>
       <label title="For huge scenarios, draw compact mini clusters"><input id="mini" type="checkbox" checked/> Mini Webs</label>
     </div>
-    <div class="row">
+    <div class="row" id="selectorRow">
       <label>Root</label><select id="rootSel"><option>All Keys</option></select><button id="rootRnd" class="iconbtn">🎲</button>
-      <label>Base</label><select id="baseSel"><option>All Base Modes</option></select><button id="baseRnd" class="iconbtn">🎲</button>
-      <label>Sub</label><select id="subSel"><option>All Sub Modes</option></select><button id="subRnd" class="iconbtn">🎲</button>
+      <span id="baseWrap" class="row" style="gap:10px">
+        <label>Base</label><select id="baseSel"><option>All Base Modes</option></select><button id="baseRnd" class="iconbtn">🎲</button>
+      </span>
+      <span id="subWrap" class="row" style="gap:10px">
+        <label>Sub</label><select id="subSel"><option>All Sub Modes</option></select><button id="subRnd" class="iconbtn">🎲</button>
+      </span>
       <label>Start</label><select id="startSel"><option>(none)</option></select>
       <label>End</label><select id="endSel"><option>(none)</option></select>
     </div>
@@ -104,6 +117,12 @@
     </svg>
     <div class="small"> Hotkeys: G (generate), R (reset), 1–8 (play).</div>
   </div>
+
+  <!-- Explanations panel (beneath viz) -->
+  <div id="explainWrap" class="panel" style="display:none">
+    <h3>Modulation / Movement Explanations</h3>
+    <div id="explainList"></div>
+  </div>
 </div>
 <div id="tip" class="tooltip"></div>
 
@@ -126,12 +145,34 @@
         <div id="parseStats" class="small" style="font-family:ui-monospace,Menlo,Consolas,monospace"></div>
       </div>
     </div>
+
+    <!-- PMI block -->
+    <div class="panel" style="margin-top:10px">
+      <div class="row">
+        <label><input type="checkbox" id="pmiToggle"/> Procedural Modal Interchange (no data)</label>
+        <span class="small">Borrow diatonic 7th chords from all parallel modes of the selected root.</span>
+      </div>
+      <div class="row small">
+        In PMI mode: Base/Sub controls are hidden; Start/End menus list only PMI chords; the viz shows a ring per mode.
+      </div>
+    </div>
+
+    <!-- NEW: Modulation explanations toggle -->
+    <div class="panel" style="margin-top:10px">
+      <div class="row">
+        <label><input type="checkbox" id="explainToggle"/> Explain modulations between cards</label>
+        <span class="small">Labels like circle-of-fifths, secondary dominant (V/x), tritone sub (♭II7), chromatic mediant, common-tone, modal interchange, etc.</span>
+      </div>
+    </div>
   </div>
 </div>
 
 <script>
 /* ===== Helpers ===== */
 const normLabel = s => (s||"").replace(/\s+/g,' ').trim();
+function el(id){return document.getElementById(id)}
+function val(id){return el(id).value}
+const rand = n => Math.floor(Math.random()*n);
 
 /* ===== Music helpers ===== */
 const noteToSemi = {
@@ -149,8 +190,34 @@ const MODE_STEPS = {
   aeolian:[0,2,3,5,7,8,10],
   locrian:[0,1,3,5,6,8,10],
 };
+/* 7th chord qualities by mode degree (parallel-mode diatonic) */
+const MODE_QUALS = {
+  ionian:     ["maj7","min7","min7","maj7","dom7","min7","min7b5"],
+  dorian:     ["min7","min7","maj7","dom7","min7","min7b5","maj7"],
+  phrygian:   ["min7","maj7","dom7","min7","min7b5","maj7","min7"],
+  lydian:     ["maj7","dom7","min7","min7b5","maj7","min7","min7"],
+  mixolydian: ["dom7","min7","min7b5","maj7","min7","min7","maj7"],
+  aeolian:    ["min7","min7b5","maj7","min7","min7","maj7","dom7"],
+  locrian:    ["min7b5","maj7","min7","min7","maj7","maj7","min7"]
+};
+/* colors */
+const baseCols=["#22c55e","#10b981","#06b6d4","#3b82f6","#6366f1","#a855f7","#ef4444"];
+const subCols = ["#ef4444","#f59e0b","#84cc16","#10b981","#06b6d4","#3b82f6","#a855f7"];
+function modeRank(s){ s=(s||"").toLowerCase(); for(let i=0;i<MODE_ORDER.length;i++){ if(s.includes(MODE_ORDER[i].toLowerCase())) return i; } return 999; }
+function sortModesCW(a,b){ const ra=modeRank(a), rb=modeRank(b); if(ra!==rb) return ra-rb; return (a||"").localeCompare(b||""); }
+function displaySubLabel(S){
+  let parts=(S||"").trim().split(/\s+/);
+  if(parts.length && /^[A-G](?:#|b)?$/i.test(parts[0])) parts=parts.slice(1);
+  return parts.join(' ');
+}
+function subFamilyIndex(S){
+  const disp = displaySubLabel(S||"");
+  const head = (disp.split(/\s+/)[0]||"").toLowerCase();
+  const i = MODE_ORDER.findIndex(m => m.toLowerCase()===head);
+  return i>=0 ? i : 0;
+}
+function subFamilyColor(S){ return subCols[subFamilyIndex(S) % subCols.length]; }
 
-/* === Key ordering helpers (top-level) === */
 function keySemitone(K){
   const k = (K || "").trim();
   if (Object.prototype.hasOwnProperty.call(noteToSemi, k)) return noteToSemi[k];
@@ -166,31 +233,40 @@ function sortKeysChromatic(arr, start='C'){
   });
 }
 
-const rand = n => Math.floor(Math.random()*n);
+/* === Parsing chord labels (min7b5 / ø7 / dom7 / maj7 / min7 supported) === */
 const romanRe = /^[b♭]?(?:I|II|III|IV|V|VI|VII)°?$/i;
-
-/* parsing */
 function parseLabel(s){
   const parts=(s||"").trim().split(/\s+/);
   if(!parts.length) return null;
+  const qTok = parts.find(p => /^(maj7|dom7|min7b5|min7|dim7|m7b5|ø7|7)$/i.test(p));
+  let quality = null;
+  if(qTok){
+    const ql = qTok.toLowerCase();
+    quality = (ql==="m7b5"||ql==="ø7") ? "min7b5" :
+              (ql==="7") ? "dom7" : qTok.toLowerCase();
+  }
   let numeral=""; let rootTokens=parts;
   if(romanRe.test(parts.at(-1)||"")){ numeral=parts.at(-1); rootTokens=parts.slice(0,-1); }
-  let root=rootTokens.join("");
-  if(root.endsWith("°")) return [root.slice(0,-1),'dim7'];
-  if(root.endsWith("m")) return [root.slice(0,-1),'min7'];
-  if((numeral||"").toLowerCase()==='v') return [root,'dom7'];
-  const q={"i":"maj7","ii":"min7","iii":"min7","iv":"maj7","v":"dom7","vi":"min7","vii":"dim7"}[(numeral||"").toLowerCase()]||"maj7";
-  return [root,q];
+  let root=rootTokens.filter(t=>!/^maj7|dom7|min7b5|min7|dim7|m7b5|ø7|7$/i.test(t)).join("");
+  if(!quality){
+    if(root.endsWith("°")) { root=root.slice(0,-1); quality="dim7"; }
+    else if(root.endsWith("m")) { root=root.slice(0,-1); quality="min7"; }
+    else if((numeral||"").toLowerCase()==='v') quality="dom7";
+    else {
+      quality={"i":"maj7","ii":"min7","iii":"min7","iv":"maj7","v":"dom7","vi":"min7","vii":"min7b5"}[(numeral||"").toLowerCase()]||"maj7";
+    }
+  }
+  return [root,quality];
 }
 function build7th(root,quality){
   const R=noteToSemi[root.replace("♯","#").replace("♭","b")] ?? 0;
-  const iv={'maj7':[0,4,7,11],'min7':[0,3,7,10],'dom7':[0,4,7,10],'dim7':[0,3,6,9]}[quality]||[0,4,7,11];
+  const iv={'maj7':[0,4,7,11],'min7':[0,3,7,10],'dom7':[0,4,7,10],'dim7':[0,3,6,9],'min7b5':[0,3,6,10]}[quality]||[0,4,7,11];
   return [iv.map(i=>R+i), R];
 }
 function chordPCSet(label){ const p=parseLabel(label); if(!p) return new Set(); const [r,q]=p; const [ns]=build7th(r,q); return new Set(ns.map(n=>((n%12)+12)%12)); }
 function jaccard(A,B){ let i=0; for(const x of A){ if(B.has(x)) i++; } const u=A.size+B.size-i; return u? i/u : 0; }
 
-/* ===== Families for a (root, base) in modal order ===== */
+/* ===== Families for a (root, base) ===== */
 function familiesFor(rootKey, base){
   const baseName = (base || "Ionian").replace(/^[A-G](?:#|b)?\s+/, "");
   const steps = MODE_STEPS[(baseName || "ionian").toLowerCase()] || MODE_STEPS.ionian;
@@ -198,16 +274,8 @@ function familiesFor(rootKey, base){
   return steps.map(d => `${CANON[(R + d + 1200) % 12]} ${baseName}`);
 }
 
-/* ===== Data model =====
-   DB.data[key][base][sub] = [{family: <col D>, degrees: [E..K]}...] */
+/* ===== Data model (spreadsheet mode) ===== */
 const DB={keys:[],data:{},stats:{sheets:0,rows:0,rowsUsed:0,chordCells:0},nodeIndex:new Map()};
-function modeRank(s){ s=(s||"").toLowerCase(); for(let i=0;i<MODE_ORDER.length;i++){ if(s.includes(MODE_ORDER[i].toLowerCase())) return i; } return 999; }
-function sortModesCW(a,b){ const ra=modeRank(a), rb=modeRank(b); if(ra!==rb) return ra-rb; return (a||"").localeCompare(b||""); }
-function displaySubLabel(S){
-  let parts=(S||"").trim().split(/\s+/);
-  if(parts.length && /^[A-G](?:#|b)?$/i.test(parts[0])) parts=parts.slice(1); // strip leading root
-  return parts.join(' ');
-}
 function sortSubsModal(a,b){
   const da=displaySubLabel(a), db=displaySubLabel(b);
   const ra=modeRank((da.split(/\s+/)[0]||"")), rb=modeRank((db.split(/\s+/)[0]||""));
@@ -247,6 +315,175 @@ function ingestXLSX(wb){
   DB.data=data; DB.stats={sheets:names.length,rows:total,rowsUsed:used,chordCells:chords};
 }
 
+/* ===== PMI (Procedural Modal Interchange) ===== */
+let PMI=false;
+function pmiChordsForRoot(rootKey){
+  const R = noteToSemi[rootKey]; if(R==null) return [];
+  const out=[];
+  MODE_ORDER.forEach((m,mi)=>{
+    const steps = MODE_STEPS[m.toLowerCase()];
+    const quals = MODE_QUALS[m.toLowerCase()];
+    for(let i=0;i<7;i++){
+      const pc = (R + steps[i] + 1200) % 12;
+      const note = CANON[pc];
+      const q = quals[i];
+      const label = `${note} ${q}`;
+      out.push({ label, key: rootKey, base: `${rootKey} ${m}`, sub: `${rootKey} ${m}`, family: `${note} ${m} • ${i+1}` , modeIndex: mi, degree: i });
+    }
+  });
+  const seen=new Set(); return out.filter(o=>{ const k=o.label; if(seen.has(k)) return false; seen.add(k); return true; });
+}
+
+<!-- ===== NEW: Modulation explanation engine (expanded) ===== -->
+
+let EXPLAIN=false;
+
+/* helpers for theory heuristics */
+const INTERVAL = (a,b)=> (b - a + 12) % 12;
+const isDom7 = q => q==="dom7";
+const isMin7 = q => q==="min7" || q==="min7b5"; // treat ø as minor-ish for some patterns
+const isMaj7 = q => q==="maj7";
+
+/* Build diatonic 7ths for a key center (Ionian or Aeolian) */
+function diatonicSevenths(rootPc, mode /* "ionian"|"aeolian" */){
+  const steps = MODE_STEPS[mode];
+  const quals = MODE_QUALS[mode];
+  const out = [];
+  for(let i=0;i<7;i++){
+    const pc = (rootPc + steps[i]) % 12;
+    out.push(`${CANON[pc]} ${quals[i]}`);
+  }
+  return out;
+}
+/* Precompute all 24 key palettes (major/minor) for pivot detection */
+const KEY_PALETTES = (()=>{
+  const m = new Map();
+  for(let pc=0; pc<12; pc++){
+    const M = diatonicSevenths(pc,"ionian");
+    const mSet = new Set(M.map(normLabel));
+    m.set(`${CANON[pc]} major`, mSet);
+    const N = diatonicSevenths(pc,"aeolian");
+    const nSet = new Set(N.map(normLabel));
+    m.set(`${CANON[pc]} minor`, nSet);
+  }
+  return m;
+})();
+
+/* label builders */
+const tag = (s)=>`<span class="tag">${s}</span>`;
+
+/* the brain: explain relationship between two chords A→B */
+function explainBetween(a,b){
+  // a/b come like {label, base, ...}
+  const [ar,aq]=parseLabel(a.label)||["C","maj7"];
+  const [br,bq]=parseLabel(b.label)||["C","maj7"];
+  const aR=noteToSemi[ar], bR=noteToSemi[br];
+  const pcA=chordPCSet(a.label), pcB=chordPCSet(b.label);
+  const diff = INTERVAL(aR,bR);          // upward interval a→b
+  const fifthDown = (aR + 5) % 12;       // "resolves" target from A if A is dominant
+  const thirdUp   = (aR + 4) % 12;       // major third up
+  const deceptiveTgt = (aR + 2) % 12;    // classic V→vi in major keys is +2 semitones
+  const out=[];
+
+  /* 1) Functional & applied */
+  // Circle of fifths (descending 5ths / ascending 4ths)
+  if (bR === fifthDown) out.push("circle of fifths (V→I)");
+
+  // Secondary dominant: A is dom7 resolving down a fifth to B
+  if (isDom7(aq) && bR === fifthDown) out.push(`secondary dominant (V/${br})`);
+
+  // ii–V (applied) inference: A is min7 and B is dom7 a 4th above A
+  // (B root == A root +5 semitones means A is ii of B)
+  if (isMin7(aq) && isDom7(bq) && INTERVAL(aR,bR)===5){
+    const target = CANON[(bR + 5) % 12];
+    out.push(`applied ii–V of ${target} (implied)`);
+  }
+
+  // Deceptive: V → vi (or V → i)
+  if (isDom7(aq) && bR === deceptiveTgt) out.push("deceptive resolution (V→vi/i)");
+
+  /* 2) Substitution & jazz */
+  // Tritone sub: dom7 to a tritone-related root
+  if (isDom7(aq) && diff===6){
+    const target = CANON[(bR + 5) % 12];
+    out.push(`tritone sub (♭II7) of V/${target}`);
+  }
+
+  // Backdoor: ♭VII7 → I (roots up whole step, dom7 → maj7/min)
+  if (isDom7(aq) && (INTERVAL(aR,bR)===2) && (isMaj7(bq) || bq==="min7")){
+    out.push("backdoor cadence (♭VII7→I)");
+  }
+
+  /* 3) Modal mixture & key relations */
+  // Parallel modal shift (same root, different quality)
+  if (aR===bR && aq!==bq) out.push(`parallel modal shift (${ar}: ${aq}→${bq})`);
+
+  // Relative key color: Imaj7 ↔ vi7 (or i7 ↔ ♭IIImaj7)
+  if ((isMaj7(aq) && isMin7(bq) && INTERVAL(aR,bR)===9) ||
+      (isMin7(aq) && isMaj7(bq) && INTERVAL(aR,bR)===3)){
+    out.push("relative key move (I↔vi or i↔♭III)");
+  }
+
+  // Modal interchange flag (especially in PMI or when bases differ)
+  if (PMI || (a.base && b.base && a.base!==b.base)){
+    const am = (a.base||"").split(/\s+/).at(-1)||"";
+    const bm = (b.base||"").split(/\s+/).at(-1)||"";
+    if (am || bm) out.push(`modal interchange (${am}→${bm})`);
+  }
+
+  /* 4) Chromatic families */
+  // Chromatic mediant family (±3 or ±4 or ±8 or ±9 semitones)
+  if ([3,4,8,9].includes(diff)) out.push(`chromatic mediant (${diff}↑)`);
+  // Semitone side-step
+  if (diff===1 || diff===11) out.push("chromatic side-step (±½)");
+
+  /* 5) Common materials */
+  // Common tones (list up to 3)
+  const shared=[...pcA].filter(x=>pcB.has(x));
+  if (shared.length>=3){
+    out.push(`rich common-tone (${shared.map(x=>CANON[x]).slice(0,3).join(", ")})`);
+  } else if (shared.length>=2){
+    out.push(`common-tone (${shared.map(x=>CANON[x]).slice(0,3).join(", ")})`);
+  } else if (shared.length===1){
+    out.push(`single common-tone (${CANON[shared[0]]})`);
+  }
+
+  // Common-chord (pivot) detection: both chords diatonic to same key (major/minor)
+  const aLab = normLabel(a.label), bLab = normLabel(b.label);
+  for(const [kName,set] of KEY_PALETTES.entries()){
+    if(set.has(aLab) && set.has(bLab)){ out.push(`common-chord pivot in ${kName}`); break; }
+  }
+
+  /* 6) Symmetry hubs */
+  // Diminished 7th reinterpretation potential
+  if (aq==="dim7") out.push("enharmonic pivot (°7 can resolve to 4 keys)");
+  // Augmented triad isn’t in 7ths set; skip
+
+  /* 7) Fallback descriptors */
+  if(!out.length){
+    if (diff===7) out.push("fifths motion (↑5th)");
+    else if (diff===0 && aq===bq) out.push("static color (same chord class)");
+    else out.push(`non-functional/planar move (${ar}→${br})`);
+  }
+  return out;
+}
+
+function renderExplanations(){
+  const wrap=el('explainWrap'), list=el('explainList');
+  if(!EXPLAIN || !CURRENT.length){ wrap.style.display='none'; list.innerHTML=''; return; }
+  const rows=[];
+  for(let i=0;i<CURRENT.length-1;i++){
+    const A=CURRENT[i], B=CURRENT[i+1];
+    const methods=explainBetween(A,B);
+    rows.push(
+      `<div class="exline"><strong>#${i+1} → #${i+2}</strong> • ${A.label} → ${B.label} ${methods.map(tag).join(" ")}</div>`
+    );
+  }
+  list.innerHTML=rows.join('');
+  wrap.style.display = rows.length ? 'block' : 'none';
+}
+
+
 /* ===== UI: selectors ===== */
 function updateSelectors(){
   const rootSel=document.getElementById('rootSel');
@@ -257,6 +494,11 @@ function updateSelectors(){
 }
 function onRootChange(){
   const k=val('rootSel');
+  if(PMI){
+    refreshChoicesFromPMI();
+    render();
+    return;
+  }
   const baseSel=document.getElementById('baseSel');
   const subSel=document.getElementById('subSel');
   if(k==="All Keys"){ baseSel.innerHTML=`<option>All Base Modes</option>`; subSel.innerHTML=`<option>All Sub Modes</option>`; }
@@ -269,6 +511,7 @@ function onRootChange(){
   render();
 }
 function onBaseChange(){
+  if(PMI){ render(); return; }
   const k=val('rootSel'), b=val('baseSel');
   const subSel=document.getElementById('subSel');
   if(k==="All Keys" || b==="All Base Modes"){ subSel.innerHTML=`<option>All Sub Modes</option>`; }
@@ -280,32 +523,25 @@ function onBaseChange(){
   render();
 }
 
-/* NEW: make Start/End reflect what’s actually drawn */
-function refreshChoices(){  // simple delegator
-  refreshChoicesFromViz();
-}
-
+/* Start/End options */
+function refreshChoices(){ refreshChoicesFromViz(); }
 function refreshChoicesFromViz(){
-  // If you want to hide Start/End when Root = All Keys, uncomment next 5 lines:
-  // const k = val('rootSel');
-  // if (k === 'All Keys') {
-  //   const opts = ['(none)'].map(v => `<option>${v}</option>`).join('');
-  //   el('startSel').innerHTML = opts; el('endSel').innerHTML = opts; return;
-  // }
-
+  if(PMI){ refreshChoicesFromPMI(); return; }
   const labels = Array.from(DB.nodeIndex.keys()).sort();
   const opts = ['(none)', ...labels].map(v => `<option>${v}</option>`).join('');
-
-  // preserve previous selections if they still exist
   const keep = (selId) => {
     const sel = el(selId);
     const prev = sel.value || '(none)';
     sel.innerHTML = opts;
     sel.value = labels.includes(prev) ? prev : '(none)';
   };
-
-  keep('startSel');
-  keep('endSel');
+  keep('startSel'); keep('endSel');
+}
+function refreshChoicesFromPMI(){
+  const k = val('rootSel');
+  const optsArr = (k && k!=="All Keys") ? pmiChordsForRoot(k).map(o=>o.label).sort() : [];
+  const opts = ['(none)', ...optsArr].map(v=>`<option>${v}</option>`).join('');
+  ['startSel','endSel'].forEach(id=>{ const s=el(id); const prev=s.value||'(none)'; s.innerHTML=opts; s.value = optsArr.includes(prev)?prev:'(none)'; });
 }
 
 /* ===== Sampling ===== */
@@ -329,38 +565,49 @@ function bucketsFor(k,b,s){
 }
 
 function sample(n){
-  const k = val('rootSel'), b = val('baseSel'), s = val('subSel');
   const spicy = parseInt(val('spicy'))/100;
-
   const startSel = val('startSel');
   const endSel   = val('endSel');
   const startOpt = (startSel && startSel !== "(none)") ? normLabel(startSel) : null;
   const endOpt   = (endSel   && endSel   !== "(none)") ? normLabel(endSel)   : null;
 
-  // Build constrained pool from current settings
-  const groups = bucketsFor(k,b,s);
-  const pool = [];
-  for (const g of groups){
-    g.row.forEach((label,ci)=>{
-      const lab = normLabel(label);
-      pool.push({label: lab, key:g.key, base:g.base, sub:g.sub, family:g.family, ci});
-    });
+  // Build pool from current mode (PMI or Data)
+  let pool=[];
+  if(PMI){
+    const k = val('rootSel');
+    if(!k || k==="All Keys"){ el('notice').textContent="Pick a specific root for PMI."; return []; }
+    pool = pmiChordsForRoot(k).map(p=>({ ...p }));
+  }else{
+    const k = val('rootSel'), b = val('baseSel'), s = val('subSel');
+    const groups = bucketsFor(k,b,s);
+    for (const g of groups){
+      g.row.forEach((label,ci)=>{
+        const lab = normLabel(label);
+        pool.push({label: lab, key:g.key, base:g.base, sub:g.sub, family:g.family, ci});
+      });
+    }
   }
+
   if (!pool.length) {
     el('notice').textContent = "No chords available for this selection.";
     return [];
   }
 
-  // Fast lookups / helpers
+  // Start/End validation
   const allowed = new Set(pool.map(p => p.label));
-  const used = new Set();
+  if (startOpt && !allowed.has(startOpt)) { el('notice').textContent = `Start "${startOpt}" isn’t available for these settings.`; return []; }
+  if (endOpt && !allowed.has(endOpt))   { el('notice').textContent = `End "${endOpt}" isn’t available for these settings.`; return []; }
 
+  // Shuffle
+  for (let i = pool.length-1; i > 0; i--) { const j = Math.floor(Math.random()*(i+1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+
+  const used = new Set();
+  const out = [];
   function popExact(lab){
     const idx = pool.findIndex(o => o.label === lab);
     if (idx < 0) return null;
     return pool.splice(idx,1)[0];
   }
-
   function biasedPick(prev, bannedLabel){
     if (!pool.length) return null;
     const candidates = bannedLabel ? pool.filter(o => o.label !== bannedLabel) : pool.slice();
@@ -371,7 +618,6 @@ function sample(n){
       const idx = pool.findIndex(o => o === pick);
       return pool.splice(idx,1)[0];
     }
-
     const A = chordPCSet(prev.label);
     const kTop = Math.min(12, candidates.length);
     const tail = candidates.slice(-kTop).map((o, i) => ({
@@ -385,72 +631,23 @@ function sample(n){
     return pool.splice(choice.poolIdx, 1)[0];
   }
 
-  // Validate Start/End against allowed pool
-  if (startOpt && !allowed.has(startOpt)) {
-    el('notice').textContent = `Start "${startOpt}" isn’t available for these settings.`;
-    return [];
-  }
-  if (endOpt && !allowed.has(endOpt)) {
-    el('notice').textContent = `End "${endOpt}" isn’t available for these settings.`;
-    return [];
-  }
+  let startPick=null, endPick=null;
+  if (startOpt) { startPick = popExact(startOpt); out.push(startPick); used.add(startPick.label); }
+  if (endOpt && (!startPick || endOpt !== startPick.label)) { endPick = popExact(endOpt); }
 
-  // Shuffle pool for randomness baseline
-  for (let i = pool.length-1; i > 0; i--) {
-    const j = Math.floor(Math.random()*(i+1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
-  }
-
-  const out = [];
-  let startPick = null, endPick = null;
-
-  // Place Start first, if any
-  if (startOpt) {
-    startPick = popExact(startOpt);
-    out.push(startPick);
-    used.add(startPick.label);
-  }
-
-  // Reserve End (remove from pool, but don't add yet)
-  if (endOpt && (!startPick || endOpt !== startPick.label)) {
-    endPick = popExact(endOpt);
-  }
-
-  // Fill middle, honoring "noRepeat" and not stealing reserved end
   const banEndLabel = endPick ? endPick.label : null;
-  while (out.length < n - (endPick ? 1 : 0)) {
+  const want = Math.max(1, n - (endPick ? 1 : 0));
+  while (out.length < want) {
     const prev = out[out.length-1];
     const pick = biasedPick(prev, banEndLabel);
     if (!pick) break;
-    if (!el('noRepeat').checked || !used.has(pick.label)) {
-      out.push(pick);
-      used.add(pick.label);
-    }
+    if (!el('noRepeat').checked || !used.has(pick.label)) { out.push(pick); used.add(pick.label); }
   }
+  if (endPick) out.push(endPick);
 
-  // Add End as last, if requested
-  if (endPick) {
-    while (out.length < n - 1) {
-      const prev = out[out.length-1];
-      const pick = biasedPick(prev, banEndLabel);
-      if (!pick) break;
-      if (!el('noRepeat').checked || !used.has(pick.label)) {
-        out.push(pick);
-        used.add(pick.label);
-      }
-    }
-    out.push(endPick);
-    used.add(endPick.label);
-  }
-
-  if (!out.length) {
-    el('notice').textContent = "Couldn’t build a sequence with these constraints.";
-  } else {
-    el('notice').textContent = "";
-  }
+  el('notice').textContent = out.length ? "" : "Couldn’t build a sequence with these constraints.";
   return out;
 }
-
 
 /* ===== Cards & audio ===== */
 let audioCtx=null; function ctx(){ if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)(); return audioCtx; }
@@ -470,42 +667,32 @@ function playChord(notes,gain=0.45,seconds=0.9){
 }
 function drawKeys(notes, rootPC){
   const onset=new Set((notes||[]).map(n=>((n%12)+12)%12));
-  const NS="http://www.w3.org/2000/svg", W=420,H=110;
-  const svg=document.createElementNS(NS,"svg");
+  const NS="http://www.w3.org/200/svg", W=420,H=110; // typo-proofing var not used
+  const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");
   svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
 
-  const keys=[];
-  const whites=[]; let count=0, midi=48;
-  while(count<22){
-    const pc = ((midi%12)+12)%12;
-    if(![1,3,6,8,10].includes(pc)){ whites.push(midi); count++; }
-    midi++;
-  }
+  const keys=[], whites=[]; let count=0, midi=48;
+  while(count<22){ const pc=((midi%12)+12)%12; if(![1,3,6,8,10].includes(pc)){ whites.push(midi); count++; } midi++; }
   const ww=W/22;
 
   whites.forEach((m,i)=>{
     const pc=((m%12)+12)%12; const x=i*ww;
-    const r=document.createElementNS(NS,"rect");
-    r.setAttribute("x",x); r.setAttribute("y",0);
-    r.setAttribute("width",ww); r.setAttribute("height",H);
-    r.setAttribute("fill", onset.has(pc) ? "#86efac" : "#ffffff");
-    r.setAttribute("stroke","#222");
+    const r=document.createElementNS("http://www.w3.org/2000/svg","rect");
+    r.setAttribute("x",x); r.setAttribute("y",0); r.setAttribute("width",ww); r.setAttribute("height",H);
+    r.setAttribute("fill", onset.has(pc) ? "#86efac" : "#ffffff"); r.setAttribute("stroke","#222");
     svg.appendChild(r);
     keys.push({midi:m, pc, isBlack:false, x, w:ww});
   });
 
-  for(let n=48;n<48+36;n++){
+  for(let n=48;n<84;n++){
     const pc=((n%12)+12)%12;
     if([1,3,6,8,10].includes(pc)){
       const wi = whites.findIndex(w=>w>n) - 1;
       if(wi>=0){
         const x = wi*ww + ww*0.65;
-        const r=document.createElementNS(NS,"rect");
-        r.setAttribute("x",x); r.setAttribute("y",0);
-        r.setAttribute("width",ww*0.6); r.setAttribute("height",H*0.65);
-        r.setAttribute("fill", onset.has(pc) ? "#86efac" : "#111");
-        r.setAttribute("stroke","#222");
-        r.setAttribute("rx","2"); r.setAttribute("ry","2");
+        const r=document.createElementNS("http://www.w3.org/2000/svg","rect");
+        r.setAttribute("x",x); r.setAttribute("y",0); r.setAttribute("width",ww*0.6); r.setAttribute("height",H*0.65);
+        r.setAttribute("fill", onset.has(pc) ? "#86efac" : "#111"); r.setAttribute("stroke","#222"); r.setAttribute("rx","2"); r.setAttribute("ry","2");
         svg.appendChild(r);
         keys.push({midi:n, pc, isBlack:true, x, w:ww*0.6});
       }
@@ -517,16 +704,13 @@ function drawKeys(notes, rootPC){
   if(candidates.length){
     const center = W/2; candidates.sort((a,b)=>Math.abs((a.x+a.w/2)-center) - Math.abs((b.x+b.w/2)-center));
     const k0 = candidates[0]; const cx = k0.x + k0.w/2; const cy = k0.isBlack ? (H*0.22) : (H-8);
-    const dot=document.createElementNS(NS,"circle");
-    dot.setAttribute("cx",cx); dot.setAttribute("cy",cy);
-    dot.setAttribute("r",5); dot.setAttribute("fill","#60a5fa");
-    dot.setAttribute("stroke","#1e3a8a"); dot.setAttribute("stroke-width","1.5");
-    dot.setAttribute("pointer-events","none");
+    const dot=document.createElementNS("http://www.w3.org/2000/svg","circle");
+    dot.setAttribute("cx",cx); dot.setAttribute("cy",cy); dot.setAttribute("r",5); dot.setAttribute("fill","#60a5fa");
+    dot.setAttribute("stroke","#1e3a8a"); dot.setAttribute("stroke-width","1.5"); dot.setAttribute("pointer-events","none");
     svg.appendChild(dot);
   }
   return svg;
 }
-
 function renderCards(seq){
   CURRENT=seq.slice();
   SEL_CHOICE.clear();
@@ -535,7 +719,7 @@ function renderCards(seq){
   seq.forEach((o,i)=>{
     const [root,q]=parseLabel(o.label); const [notes,R]=build7th(root,q);
     const card=document.createElement('div'); card.className="card";
-    const meta=document.createElement('div'); meta.style.flex="0 0 160px"; meta.innerHTML=`<h3>#${i+1}</h3><div>${o.label}</div><div class="small">${o.key} • ${o.base} • ${displaySubLabel(o.sub)}${o.family?(' • '+o.family):''}</div>`;
+    const meta=document.createElement('div'); meta.style.flex="0 0 160px"; meta.innerHTML=`<h3>#${i+1}</h3><div>${o.label}</div><div class="small">${PMI?(`${o.key} • PMI • ${o.base}`):(`${o.key} • ${o.base} • ${displaySubLabel(o.sub)}`)}${o.family?(' • '+o.family):''}</div>`;
     const img=document.createElement('div'); img.style.flex="1"; img.appendChild(drawKeys(notes, R%12));
     const btns=document.createElement('div'); btns.style.display="flex"; btns.style.flexDirection="column"; btns.style.gap="8px"; btns.style.width="120px";
     const play=document.createElement('button'); play.textContent="▶️ Play"; play.onclick=()=>{ ctx().resume(); playChord(notes,vol); pulseByLabel(o.label); };
@@ -543,6 +727,7 @@ function renderCards(seq){
     card.append(meta,img,btns); cont.append(card);
   });
   showSelectionOverlay(); drawSelectionPath();
+  renderExplanations(); // <= update explanations when cards change
 }
 
 /* ===== SVG / Rendering ===== */
@@ -550,27 +735,14 @@ const svg=el('sun'), gZoom=el('zoomG'), gModes=el('modesG'), gChart=el('chartG')
 const W=1200,H=860,CX=W/2,CY=H/2;
 function mk(tag,attr){ const e=document.createElementNS('http://www.w3.org/2000/svg',tag); for(const [k,v] of Object.entries(attr||{})) e.setAttribute(k,v); return e; }
 function polar(r,a){ const rad=a*Math.PI/180; return [CX + r*Math.cos(rad), CY + r*Math.sin(rad)]; }
-const baseCols=["#22c55e","#10b981","#06b6d4","#3b82f6","#6366f1","#a855f7","#ef4444"];
 function colorFor(B,S,ri){ if(ri!=null) return ["#7dd3fc","#93c5fd","#a7f3d0","#fde68a","#fca5a5","#c7d2fe","#99f6e4","#fecaca"][ri%8]; return baseCols[Math.max(0,modeRank(B))%baseCols.length]; }
 
-/* ===== Sub-family palette & helpers (for All Sub Modes coloring) ===== */
-const subCols = ["#ef4444","#f59e0b","#84cc16","#10b981","#06b6d4","#3b82f6","#a855f7"];
-function subFamilyIndex(S){
-  const disp = displaySubLabel(S||"");
-  const head = (disp.split(/\s+/)[0]||"").toLowerCase();
-  const i = MODE_ORDER.findIndex(m => m.toLowerCase()===head);
-  return i>=0 ? i : 0;
-}
-function subFamilyColor(S){ return subCols[subFamilyIndex(S) % subCols.length]; }
-
+let SEL_POS=new Map();
+let SEL_CHOICE=new Map();
 function node(title,x,y,r,fill){
   const d=mk('circle',{cx:x,cy:y,r:r,fill:fill||"#93c5fd",stroke:"#0b1220","stroke-width":2,opacity:.98,class:"n","data-tip":title});
   return d;
 }
-
-/* ===== Stable selection endpoints ===== */
-let SEL_POS=new Map();
-let SEL_CHOICE=new Map();
 function showSelectionOverlay(){
   SEL_POS=new Map();
   while(gSel.firstChild) gSel.removeChild(gSel.firstChild);
@@ -586,13 +758,25 @@ function showSelectionOverlay(){
     const p = plist[idx];
     SEL_POS.set(keyLab,p);
 
-    const dot=mk('circle',{cx:p.x,cy:p.y,r:8,fill:"#fff",stroke:"#0b1220","stroke-width":2,class:"n","data-tip":`#${i+1} • ${o.label}`});
-    const num=mk('text',{x:p.x,y:p.y+4,'text-anchor':'middle',style:"font:700 11px system-ui; fill:#000; paint-order:stroke; stroke:#fff; stroke-width:2.5px"}); num.textContent=(i<9)?(i+1):'•';
-    dot.addEventListener('click',()=>pulseAt(p.x,p.y));
-    num.addEventListener('click',()=>pulseAt(p.x,p.y));
-    gSel.appendChild(dot); gSel.appendChild(num);
+    const dot = mk('circle', {
+      cx:p.x, cy:p.y, r:8,
+      fill:"#fff", stroke:"#0b1220", "stroke-width":2,
+      class:"n", "data-tip":`#${i+1} • ${o.label}`
+    });
+    const num = mk('text', {
+      x:p.x, y:p.y+4, 'text-anchor':'middle',
+      style:"font:700 11px system-ui; fill:#000; paint-order:stroke; stroke:#fff; stroke-width:2.5px"
+    });
+    num.textContent = (i<9)?(i+1):'•';
+
+    dot.addEventListener('click', ()=>pulseAt(p.x,p.y));
+    num.addEventListener('click', ()=>pulseAt(p.x,p.y));
+
+    gSel.appendChild(dot);
+    gSel.appendChild(num);
   });
 }
+
 function drawSelectionPath(){
   while(gPath.firstChild) gPath.removeChild(gPath.firstChild);
   const seq=CURRENT; if(!seq||seq.length<2) return;
@@ -611,26 +795,12 @@ function pulseByLabel(label){
   const e=SEL_POS.get(normLabel(label)) || (DB.nodeIndex.get(normLabel(label))||[])[0]; if(e) pulseAt(e.x,e.y);
 }
 
-/* ===== Degree helpers ===== */
+/* Degree helpers for spreadsheet mode */
 function degreesForFamilyExact(K,B,S,fam){
   const subs = ((DB.data[K]||{})[B]||{});
   const rows = subs[S] || [];
   const hit = rows.find(r => normLabel(r.family) === normLabel(fam));
   return hit && Array.isArray(hit.degrees) ? hit.degrees.map(normLabel) : [];
-}
-function degreesForFamilyAnySub(K,B,fam){
-  const subs = ((DB.data[K]||{})[B]||{});
-  for(const [S,rows] of Object.entries(subs)){
-    const hit = rows.find(r => normLabel(r.family)===normLabel(fam));
-    if(hit && Array.isArray(hit.degrees) && hit.degrees.length){
-      return {degrees: hit.degrees.map(normLabel), sub:S};
-    }
-  }
-  const entries = Object.entries(subs);
-  if(entries.length && entries[0][1].length && entries[0][1][0].degrees?.length){
-    return {degrees: entries[0][1][0].degrees.map(normLabel), sub: entries[0][0]};
-  }
-  return {degrees: [], sub: ""};
 }
 
 /* ===== Main render ===== */
@@ -638,22 +808,54 @@ function render(){
   [gModes,gChart,gSel,gPath,gPulse].forEach(g=>{ while(g.firstChild) g.removeChild(g.firstChild); });
   DB.nodeIndex.clear();
 
-  const k=val('rootSel'), b=val('baseSel'), s=val('subSel');
   const nodeR=parseInt(val('nodeR')), gap=parseInt(val('rowGap'));
   const mini = el('mini').checked, miniBy = el('miniGroup').value;
   const miniSpace = parseInt(val('miniSpace'));
-
   const ring0=110, ringSub=ring0+64, ringFam=ringSub+36;
   const a0=-90;
+
+  if(PMI){
+    const k = val('rootSel');
+    const centerLabel = (k && k!=="All Keys") ? k : "Pick a Root";
+    gModes.appendChild(node(centerLabel, CX, CY, 16, "#fff"));
+
+    if(!k || k==="All Keys"){ el('vizMeta').textContent="PMI • (no root chosen)"; refreshChoicesFromPMI(); renderExplanations(); return; }
+
+    const step = 360/7;
+    MODE_ORDER.forEach((m,mi)=>{
+      const a = a0 + mi*step;
+      const [cx,cy] = polar(220 + miniSpace*0.6, a);
+      gModes.appendChild(node(m, cx, cy, 7.5, baseCols[mi%7]));
+
+      const degSteps = (MODE_STEPS[m.toLowerCase()]||[]);
+      const quals    = (MODE_QUALS[m.toLowerCase()]||[]);
+      const famColor = baseCols[mi%7];
+      for(let di=0; di<7; di++){
+        const rr = 74 + 22 + di*(gap*0.75);
+        const [x,y]=[ cx + Math.cos((a-90)*Math.PI/180)*rr, cy + Math.sin((a-90)*Math.PI/180)*rr ];
+        const pc = (keySemitone(k) + degSteps[di] + 1200) % 12;
+        const label = `${CANON[pc]} ${quals[di]}`;
+        const d=node(label,x,y,nodeR, famColor);
+        gChart.appendChild(d);
+        (DB.nodeIndex.get(label) || DB.nodeIndex.set(label,[]), DB.nodeIndex.get(label)).push({x,y});
+      }
+    });
+
+    el('vizMeta').textContent = `PMI • ${k}`;
+    refreshChoicesFromPMI();
+    showSelectionOverlay(); drawSelectionPath();
+    renderExplanations();
+    return;
+  }
+
+  // ===== Spreadsheet render paths =====
+  const k=val('rootSel'), b=val('baseSel'), s=val('subSel');
 
   const scenario = (k!=="All Keys" && b!=="All Base Modes" && s!=="All Sub Modes") ? 1 :
                    (k!=="All Keys" && b!=="All Base Modes" && s==="All Sub Modes") ? 2 :
                    (k!=="All Keys" && b==="All Base Modes" && s==="All Sub Modes") ? 3 : 0;
 
-  let centerLabel = "All Keys";
-  if(scenario===1) centerLabel = displaySubLabel(s);
-  else if(scenario===2) centerLabel = `${k} ${b.replace(/^[A-G](?:#|b)?\s+/,"")}`;
-  else if(scenario===3) centerLabel = k;
+  const centerLabel = (scenario===1)? displaySubLabel(s) : (scenario===2? `${k} ${b.replace(/^[A-G](?:#|b)?\s+/,"")}` : (scenario===3? k : "All Keys"));
   gModes.appendChild(node(centerLabel, CX, CY, 16, "#fff"));
 
   if(scenario===1){
@@ -676,34 +878,13 @@ function render(){
         (DB.nodeIndex.get(lab) || DB.nodeIndex.set(lab,[]), DB.nodeIndex.get(lab)).push({x,y});
       }
     }
-
-    const LIDX = new Map();
-    rows.forEach(r=>{
-      const famName = normLabel(r.family||"");
-      const fiRaw = famOrder.findIndex(f => normLabel(f) === famName);
-      const fi = fiRaw >= 0 ? fiRaw : 0;
-      (r.degrees||[]).forEach((d,di)=>{ LIDX.set(normLabel(d), { fi, di }); });
-    });
-
-    (CURRENT||[]).forEach(o=>{
-      const lab = normLabel(o.label);
-      if(!DB.nodeIndex.has(lab) && LIDX.has(lab)){
-        const { fi, di } = LIDX.get(lab);
-        const a  = aStart + fi*step;
-        const rr = ringFam + 30 + di*gap;
-        const [x,y] = polar(rr, a);
-        const d = node(lab, x, y, nodeR, colorFor(b, s, di));
-        gChart.appendChild(d);
-        (DB.nodeIndex.get(lab) || DB.nodeIndex.set(lab,[]), DB.nodeIndex.get(lab)).push({x,y});
-      }
-    });
   }
   else if(scenario===2){
     const subsUnique = uniqueSubsForBase(k,b);
     const useSubColors = true;
-    if(mini && miniBy==='sub'){
+    if(el('mini').checked && el('miniGroup').value==='sub'){
       const step=360/Math.max(1,subsUnique.length);
-      const ringCluster = 200 + miniSpace * 1.4;
+      const ringCluster = 200 + parseInt(val('miniSpace')) * 1.4;
       subsUnique.forEach((obj,si)=>{
         const S=obj.value, Slabel=obj.disp;
         const a=a0+si*step; const [cx,cy]=polar(ringCluster,a);
@@ -714,15 +895,15 @@ function render(){
         const famMap=new Map(); rows.forEach(r=>{ if(r.family) famMap.set(normLabel(r.family), r.degrees.map(normLabel)); });
 
         for(let fi=0; fi<7; fi++){
-          const aa = (a-90) + fi*(360/Math.max(7,7));
+          const aa = (a-90) + fi*(360/7);
           const [fx,fy]=[ cx + Math.cos(aa*Math.PI/180)*74, cy + Math.sin(aa*Math.PI/180)*74 ];
           gModes.appendChild(node(famOrder[fi], fx,fy,6, baseCols[fi%7]));
           const degs=famMap.get(normLabel(famOrder[fi])) || (rows[fi]?.degrees||rows[0]?.degrees||[]).map(normLabel);
           for(let di=0; di<Math.min(7,degs.length); di++){
-            const rr = 74 + 20 + di*(gap*0.75);
+            const rr = 74 + 20 + di*(parseInt(val('rowGap'))*0.75);
             const [x,y]=[ cx + Math.cos(aa*Math.PI/180)*rr, cy + Math.sin(aa*Math.PI/180)*rr ];
             const lab=normLabel(degs[di]);
-            const d=node(lab,x,y,nodeR, useSubColors ? subFamilyColor(S) : colorFor(b,S,di));
+            const d=node(lab,x,y,parseInt(val('nodeR')), useSubColors ? subFamilyColor(S) : colorFor(b,S,di));
             gChart.appendChild(d);
             (DB.nodeIndex.get(lab) || DB.nodeIndex.set(lab,[]), DB.nodeIndex.get(lab)).push({x,y});
           }
@@ -744,9 +925,9 @@ function render(){
           gModes.appendChild(node(fam, fx,fy,6.2, baseCols[fi%7]));
           const degs=famMap.get(normLabel(fam)) || (rows[fi]?.degrees||rows[0]?.degrees||[]).map(normLabel);
           for(let di=0; di<Math.min(7,degs.length); di++){
-            const [x,y]=polar(ring0+28+26+di*gap, a);
+            const [x,y]=polar(ring0+28+26+di*parseInt(val('rowGap')), a);
             const lab=normLabel(degs[di]);
-            const d=node(lab,x,y,nodeR, subFamilyColor(S));
+            const d=node(lab,x,y,parseInt(val('nodeR')), subFamilyColor(S));
             gChart.appendChild(d);
             (DB.nodeIndex.get(lab) || DB.nodeIndex.set(lab,[]), DB.nodeIndex.get(lab)).push({x,y});
           }
@@ -758,13 +939,11 @@ function render(){
   else if(scenario===3){
     const bases = Object.keys(DB.data[k]||{}).sort(sortModesCW);
     const step=360/Math.max(1,bases.length);
-    const ringCluster=200 + miniSpace * 1.4;
-
-    if(mini){
+    const ringCluster=200 + parseInt(val('miniSpace')) * 1.4;
+    if(el('mini').checked){
       bases.forEach((B,bi)=>{
         const a=a0+bi*step; const [cx,cy]=polar(ringCluster,a);
         gModes.appendChild(node(`${k} ${B.replace(/^[A-G](?:#|b)?\s+/,"")}`, cx, cy, 7.5, "#22c55e"));
-
         const subsU = uniqueSubsForBase(k,B);
         const st=360/Math.max(1,7*subsU.length);
         let blockStart = 0;
@@ -783,10 +962,10 @@ function render(){
             gModes.appendChild(node(famOrder[fi], fx,fy,6, baseCols[fi%7]));
             const degs=famMap.get(normLabel(famOrder[fi])) || (rows[fi]?.degrees||rows[0]?.degrees||[]).map(normLabel);
             for(let di=0; di<Math.min(7,degs.length); di++){
-              const rr = 84 + 22 + di*(gap*0.75);
+              const rr = 84 + 22 + di*(parseInt(val('rowGap'))*0.75);
               const [x,y]=[ cx + Math.cos(aa*Math.PI/180)*rr, cy + Math.sin(aa*Math.PI/180)*rr ];
               const lab=normLabel(degs[di]);
-              const d=node(lab,x,y,nodeR, subFamilyColor(S));
+              const d=node(lab,x,y,parseInt(val('nodeR')), subFamilyColor(S));
               gChart.appendChild(d);
               (DB.nodeIndex.get(lab) || DB.nodeIndex.set(lab,[]), DB.nodeIndex.get(lab)).push({x,y});
             }
@@ -805,9 +984,9 @@ function render(){
         for(let r=0; r<G.rows.length; r++){
           const row=G.rows[r];
           for(let di=0; di<Math.min(7,row.degrees.length); di++){
-            const [x,y]=polar(130 + r*10 + di*gap, a);
+            const [x,y]=polar(130 + r*10 + di*parseInt(val('rowGap')), a);
             const lab=normLabel(row.degrees[di]);
-            const d=node(lab,x,y,nodeR, subFamilyColor(G.S));
+            const d=node(lab,x,y,parseInt(val('nodeR')), subFamilyColor(G.S));
             gChart.appendChild(d);
             (DB.nodeIndex.get(lab) || DB.nodeIndex.set(lab,[]), DB.nodeIndex.get(lab)).push({x,y});
           }
@@ -815,7 +994,7 @@ function render(){
       });
     }
   }
-  else if (k==="All Keys" && b==="All Base Modes" && s==="All Sub Modes" && mini) {
+  else if (k==="All Keys" && b==="All Base Modes" && s==="All Sub Modes" && el('mini').checked) {
     const keys = sortKeysChromatic(DB.keys, 'C');
     const keyStep = 360/Math.max(1, keys.length);
     const ringCluster = 240 + parseInt(val('miniSpace')) * 1.35;
@@ -826,7 +1005,6 @@ function render(){
     keys.forEach((K,ki)=>{
       const aKey = a0 + ki*keyStep;
       const [ux,uy] = polar(ringCluster, aKey);
-
       gModes.appendChild(node(K, ux, uy, 8.5, "#fff"));
 
       const bases = Object.keys(DB.data[K]||{}).sort(sortModesCW);
@@ -899,14 +1077,11 @@ function render(){
   el('vizMeta').textContent = `${k} • ${b} • ${s}`;
   showSelectionOverlay();
   drawSelectionPath();
-  // Repopulate Start/End with exactly what’s visible in the viz
   refreshChoicesFromViz();
+  renderExplanations(); // <= update explanations on viz change too
 }
 
 /* ===== Misc UI ===== */
-function el(id){return document.getElementById(id)}
-function val(id){return el(id).value}
-
 el('openSettings').onclick=()=>{ el('settings').style.display='flex'; };
 el('closeSettings').onclick=()=>{ el('settings').style.display='none'; };
 
@@ -919,14 +1094,21 @@ el('subSel').onchange  = ()=>{ SEL_CHOICE.clear(); render(); };
 
 el('gen').onclick=()=>{ const n=Math.max(1,Math.min(16,parseInt(val('count')||"4"))); const seq=sample(n); el('notice').textContent=seq.length? "":"No chords for this selection."; renderCards(seq); };
 el('copy').onclick=async()=>{ const txt=CURRENT.map(x=>x.label).join(', '); try{ await navigator.clipboard.writeText(txt); el('notice').textContent="Copied."; setTimeout(()=>el('notice').textContent="",1000);}catch(e){ el('notice').textContent="Copy failed."; } };
-el('resetAll').onclick=()=>{ el('count').value=4; el('vol').value=45; el('spicy').value=0; el('noRepeat').checked=true; el('mini').checked=true; el('miniSpace').value=120; el('miniGroup').value='base'; el('rootSel').value='All Keys'; el('baseSel').innerHTML=`<option>All Base Modes</option>`; el('subSel').innerHTML=`<option>All Sub Modes</option>`; scale=1; tx=0; ty=0; applyZoom(); SEL_CHOICE.clear(); render(); el('cards').innerHTML=""; CURRENT=[]; };
+el('resetAll').onclick=()=>{ el('count').value=4; el('vol').value=45; el('spicy').value=0; el('noRepeat').checked=true; el('mini').checked=true; el('miniSpace').value=120; el('miniGroup').value='base'; el('rootSel').value='All Keys'; el('baseSel').innerHTML=`<option>All Base Modes</option>`; el('subSel').innerHTML=`<option>All Sub Modes</option>`; scale=1; tx=0; ty=0; applyZoom(); SEL_CHOICE.clear(); render(); el('cards').innerHTML=""; CURRENT=[]; el('explainWrap').style.display='none'; };
 
 /* Random picks */
-el('rootRnd').onclick=()=>{ if(!DB.keys.length) return; el('rootSel').value=DB.keys[rand(DB.keys.length)]; onRootChange(); };
-el('baseRnd').onclick=()=>{ const k=val('rootSel'); if(k==="All Keys") return; const bases=Object.keys(DB.data[k]||{}).sort(sortModesCW); if(!bases.length) return; el('baseSel').value=bases[rand(bases.length)]; onBaseChange(); };
-el('subRnd').onclick=()=>{ const k=val('rootSel'), b=val('baseSel'); if(k==="All Keys"||b==="All Base Modes") return; const subs=uniqueSubsForBase(k,b); if(!subs.length) return; el('subSel').value=subs[rand(subs.length)].value; SEL_CHOICE.clear(); render(); };
+el('rootRnd').onclick=()=>{ if(PMI){
+    const all = DB.keys.length? DB.keys : ["C","Db","D","Eb","E","F","Gb","G","Ab","A","Bb","B"];
+    el('rootSel').value = all[rand(all.length)];
+    onRootChange();
+  } else {
+    if(!DB.keys.length) return; el('rootSel').value=DB.keys[rand(DB.keys.length)]; onRootChange();
+  }
+};
+el('baseRnd').onclick=()=>{ if(PMI) return; const k=val('rootSel'); if(k==="All Keys") return; const bases=Object.keys(DB.data[k]||{}).sort(sortModesCW); if(!bases.length) return; el('baseSel').value=bases[rand(bases.length)]; onBaseChange(); };
+el('subRnd').onclick=()=>{ if(PMI) return; const k=val('rootSel'), b=val('baseSel'); if(k==="All Keys"||b==="All Base Modes") return; const subs=uniqueSubsForBase(k,b); if(!subs.length) return; el('subSel').value=subs[rand(subs.length)].value; SEL_CHOICE.clear(); render(); };
 
-/* Hotkeys: 1..8 play items #1..#8; G generate; R reset */
+/* Hotkeys */
 window.addEventListener('keydown',(e)=>{
   const tag=(e.target&&e.target.tagName||'').toLowerCase();
   if(tag==='input' || tag==='select' || tag==='textarea') return;
@@ -936,7 +1118,7 @@ window.addEventListener('keydown',(e)=>{
   if(k.toLowerCase()==='r'){ e.preventDefault(); el('resetAll').click(); }
 });
 
-/* Tooltips — ONLY for nodes with class 'n' */
+/* Tooltips */
 const tip=el('tip');
 function setTip(txt,x,y){ tip.textContent=txt; tip.style.left=(x+10)+'px'; tip.style.top=(y+10)+'px'; tip.style.opacity=1; }
 function hideTip(){ tip.style.opacity=0; }
@@ -950,7 +1132,7 @@ svg.addEventListener('mousemove',(e)=>{
 });
 svg.addEventListener('mouseleave', hideTip);
 
-/* Pan + NO scroll-wheel zoom (blocked) */
+/* Pan (no wheel zoom) */
 let scale=1, tx=0, ty=0, panning=false, start={x:0,y:0};
 function applyZoom(){ gZoom.setAttribute('transform',`translate(${tx},${ty}) scale(${scale})`); }
 svg.addEventListener('wheel', (e)=>{ e.preventDefault(); }, {passive:false});
@@ -962,7 +1144,34 @@ el('zoomOut').onclick= ()=>{ const s2=Math.max(0.05,scale/1.2); tx=CX-(CX-tx)*(s
 el('zoomReset').onclick=()=>{ scale=1; tx=0; ty=0; applyZoom(); };
 el('redraw').onclick=render;
 
-/* Loaders + autoload */
+/* PMI + Explain toggles */
+el('pmiToggle').addEventListener('change', ()=>{
+  PMI = el('pmiToggle').checked;
+  const baseWrap = el('baseWrap');
+  const subWrap  = el('subWrap');
+  if(PMI){
+    baseWrap.classList.add('hide');
+    subWrap.classList.add('hide');
+    if(val('rootSel')==="All Keys"){
+      const roots = DB.keys.length? DB.keys : ["C","Db","D","Eb","E","F","Gb","G","Ab","A","Bb","B"];
+      el('rootSel').innerHTML = roots.map(k=>`<option>${k}</option>`).join("");
+      el('rootSel').value = "C";
+    }
+    refreshChoicesFromPMI();
+  } else {
+    baseWrap.classList.remove('hide');
+    subWrap.classList.remove('hide');
+    updateSelectors();
+  }
+  SEL_CHOICE.clear();
+  render();
+});
+el('explainToggle').addEventListener('change', ()=>{
+  EXPLAIN = el('explainToggle').checked;
+  renderExplanations();
+});
+
+/* Loaders + autoload (unchanged) */
 async function loadFromArrayBuffer(ab){
   try{
     const wb=XLSX.read(ab,{type:"array"}); ingestXLSX(wb); updateSelectors(); render();
