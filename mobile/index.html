@@ -56,9 +56,14 @@
         </label>
       </div>
 
+      <div class="quickRow">
+        <button id="randomAllBtn">🎲 Randomize Root/Base/Sub</button>
+        <button id="resetBtn">Reset</button>
+      </div>
+
       <div class="sliderGrid">
-        <label>Count <input id="count" type="number" min="1" max="24" value="8"/></label>
-        <label>Play speed <input id="playSpeed" type="range" min="250" max="2200" step="50" value="850"/><span id="speedReadout">850ms</span></label>
+        <label>Count <input id="count" type="number" min="1" max="48" value="8"/></label>
+        <label>Play speed <input id="playSpeed" type="range" min="180" max="2400" step="40" value="850"/><span id="speedReadout">850ms</span></label>
       </div>
 
       <div class="musicalityRow">
@@ -86,13 +91,13 @@
     <section id="mapPanel" class="mapPanel hidden">
       <div class="mapTools">
         <button id="zoomOut">−</button>
-        <button id="zoomReset">Reset</button>
+        <button id="zoomReset">Reset View</button>
         <button id="zoomIn">+</button>
       </div>
-      <svg id="webSvg" viewBox="0 0 900 700" aria-label="Chord Web view">
+      <svg id="webSvg" viewBox="0 0 1200 900" aria-label="Chord Web view">
         <g id="webZoom"></g>
       </svg>
-      <p id="mapHint">Tap a node to play it. Drag to pan.</p>
+      <p id="mapHint">Generate above updates this view. Tap nodes to play. Drag to pan. Pinch/wheel or +/- to zoom.</p>
     </section>
   </main>
   <script src="app.js"></script>
