@@ -19,13 +19,13 @@
         <h1>Chord Web Mobile</h1>
         <p id="dataStatus">Load ChordWeb data to begin</p>
       </div>
-      <button id="randomSoundBtn" class="round" title="Random sound">🎲</button>
+      <button id="settingsJump" class="round" title="Controls">⚙️</button>
     </header>
 
     <section class="panel loaderPanel" id="loaderPanel">
       <div class="loaderText">
         <b>Data-first mobile version</b>
-        <span>Uses the same spreadsheet layout as ChordWeb: sheets = keys, Base/Sub columns, chord cells across the row.</span>
+        <span>Uses the same spreadsheet layout as ChordWeb.</span>
       </div>
       <label class="fileBtn">Load .xlsx<input id="fileInput" type="file" accept=".xlsx,.xls"/></label>
       <div class="urlRow">
@@ -34,41 +34,66 @@
       </div>
     </section>
 
-    <section class="controls">
-      <div class="selectGrid">
-        <label>Key<select id="rootSel"><option>Load data</option></select></label>
-        <label>Base<select id="baseSel"><option>Any Base</option></select></label>
-        <label>Sub<select id="subSel"><option>Any Sub</option></select></label>
-        <label>Intent<select id="intentSel">
-          <option value="any">Any</option>
-          <option value="jazz">Jazz</option>
-          <option value="gospel">Gospel</option>
-          <option value="neo">Neo Soul</option>
-          <option value="dream">Dreamy</option>
-          <option value="dark">Dark</option>
-          <option value="modal">Modal</option>
-          <option value="weird">Weird</option>
-          <option value="clean">Clean</option>
-        </select></label>
+    <section id="controls" class="controls">
+      <div class="viewTabs">
+        <button id="cardsViewBtn" class="active">Cards</button>
+        <button id="webViewBtn">Web</button>
+        <button id="constViewBtn">Constellation</button>
       </div>
+
+      <div class="fieldGrid">
+        <label>Root
+          <div class="withRand"><select id="rootSel"><option>Load data</option></select><button id="rootRnd" title="Random root">🎲</button></div>
+        </label>
+        <label>Base
+          <div class="withRand"><select id="baseSel"><option>Any Base</option></select><button id="baseRnd" title="Random base">🎲</button></div>
+        </label>
+        <label>Sub
+          <div class="withRand"><select id="subSel"><option>Any Sub</option></select><button id="subRnd" title="Random sub">🎲</button></div>
+        </label>
+        <label>Start
+          <div class="withRand"><select id="startSel"><option value="">Optional</option></select><button id="startRnd" title="Random start">🎲</button></div>
+        </label>
+      </div>
+
+      <div class="sliderGrid">
+        <label>Count <input id="count" type="number" min="1" max="24" value="8"/></label>
+        <label>Play speed <input id="playSpeed" type="range" min="250" max="2200" step="50" value="850"/><span id="speedReadout">850ms</span></label>
+      </div>
+
+      <div class="musicalityRow">
+        <span>Friendly</span>
+        <input id="spicy" type="range" min="0" max="100" value="0"/>
+        <span>Scary</span>
+      </div>
+      <label class="check"><input id="noRepeat" type="checkbox" checked/> No repeat chords</label>
+
+      <div class="soundRow">
+        <select id="soundSelect"></select>
+        <button id="randomSoundBtn" title="Random sound">🎲</button>
+        <input id="volume" type="range" min="0" max="100" value="55" aria-label="Volume"/>
+      </div>
+
       <div class="actionRow">
         <button id="generateBtn" class="primary">Generate</button>
         <button id="playAllBtn">Play All</button>
         <button id="copyBtn">Copy</button>
       </div>
-      <div class="soundStrip">
-        <button id="soundBtn">Sound: Soft Piano</button>
-        <input id="volume" type="range" min="0" max="100" value="55" aria-label="Volume"/>
-      </div>
     </section>
 
     <section id="cards" class="cards"></section>
 
-    <nav class="bottomNav">
-      <button id="prevBtn">◀</button>
-      <button id="regenBtn">New</button>
-      <button id="nextBtn">▶</button>
-    </nav>
+    <section id="mapPanel" class="mapPanel hidden">
+      <div class="mapTools">
+        <button id="zoomOut">−</button>
+        <button id="zoomReset">Reset</button>
+        <button id="zoomIn">+</button>
+      </div>
+      <svg id="webSvg" viewBox="0 0 900 700" aria-label="Chord Web view">
+        <g id="webZoom"></g>
+      </svg>
+      <p id="mapHint">Tap a node to play it. Drag to pan.</p>
+    </section>
   </main>
   <script src="app.js"></script>
 </body>
