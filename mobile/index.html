@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="Chord Web Mobile"/>
+  <meta name="theme-color" content="#070914"/>
+  <title>Chord Web Mobile</title>
+  <link rel="stylesheet" href="styles.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+  <main id="app">
+    <header class="topbar">
+      <a class="ghost" href="../" aria-label="Desktop ChordWeb">🕸️</a>
+      <div>
+        <h1>Chord Web Mobile</h1>
+        <p id="dataStatus">Load ChordWeb data to begin</p>
+      </div>
+      <button id="randomSoundBtn" class="round" title="Random sound">🎲</button>
+    </header>
+
+    <section class="panel loaderPanel" id="loaderPanel">
+      <div class="loaderText">
+        <b>Data-first mobile version</b>
+        <span>Uses the same spreadsheet layout as ChordWeb: sheets = keys, Base/Sub columns, chord cells across the row.</span>
+      </div>
+      <label class="fileBtn">Load .xlsx<input id="fileInput" type="file" accept=".xlsx,.xls"/></label>
+      <div class="urlRow">
+        <input id="dataUrl" type="url" placeholder="Optional .xlsx URL"/>
+        <button id="loadUrlBtn">Load</button>
+      </div>
+    </section>
+
+    <section class="controls">
+      <div class="selectGrid">
+        <label>Key<select id="rootSel"><option>Load data</option></select></label>
+        <label>Base<select id="baseSel"><option>Any Base</option></select></label>
+        <label>Sub<select id="subSel"><option>Any Sub</option></select></label>
+        <label>Intent<select id="intentSel">
+          <option value="any">Any</option>
+          <option value="jazz">Jazz</option>
+          <option value="gospel">Gospel</option>
+          <option value="neo">Neo Soul</option>
+          <option value="dream">Dreamy</option>
+          <option value="dark">Dark</option>
+          <option value="modal">Modal</option>
+          <option value="weird">Weird</option>
+          <option value="clean">Clean</option>
+        </select></label>
+      </div>
+      <div class="actionRow">
+        <button id="generateBtn" class="primary">Generate</button>
+        <button id="playAllBtn">Play All</button>
+        <button id="copyBtn">Copy</button>
+      </div>
+      <div class="soundStrip">
+        <button id="soundBtn">Sound: Soft Piano</button>
+        <input id="volume" type="range" min="0" max="100" value="55" aria-label="Volume"/>
+      </div>
+    </section>
+
+    <section id="cards" class="cards"></section>
+
+    <nav class="bottomNav">
+      <button id="prevBtn">◀</button>
+      <button id="regenBtn">New</button>
+      <button id="nextBtn">▶</button>
+    </nav>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
